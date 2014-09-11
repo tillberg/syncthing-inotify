@@ -2,6 +2,7 @@
 ```
 export GOPATH=$(pwd)
 cd src/syncthing-inotify/
+go get
 go build
 ```
 
