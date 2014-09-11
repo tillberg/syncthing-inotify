@@ -12,6 +12,7 @@ import (
   "log"
   "flag"
   "net/url"
+  "strings"
 )
 
 
@@ -119,7 +120,9 @@ func watchRepo(repo string, directory string) {
   for {
     ev, ok := waitForEvent(sw)
     if ok && ev != nil {
-      informChange(repo, ev.Name)
+      sub := strings.TrimPrefix(ev.Name, directory)
+      sub = strings.TrimPrefix(sub, string(os.PathSeparator))
+      informChange(repo, sub)
     }
   }
 }
