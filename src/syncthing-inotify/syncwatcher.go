@@ -145,6 +145,7 @@ func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
 }
 
 func informChange(repo string, sub string) {
+  log.Println("Change detected in "+repo+": "+sub)
   data := url.Values {}
   data.Set("repo", repo)
   data.Set("sub", sub)
@@ -169,6 +170,6 @@ func informChange(repo string, sub string) {
   if res.StatusCode != 200 {
     log.Fatalf("Status %d != 200 for POST", res.StatusCode)
   } else {
-    log.Println("Syncthing will index change in "+repo+": "+sub)
+    log.Println("Syncthing is indexing change in "+repo+": "+sub)
   }
 }
