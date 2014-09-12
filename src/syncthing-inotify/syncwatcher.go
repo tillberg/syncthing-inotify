@@ -9,7 +9,10 @@ import (
   "net/http"
   "encoding/json"
   "log"
+  "fmt"
   "flag"
+  "runtime"
+  "path/filepath"
   "net/url"
   "strings"
 )
@@ -66,7 +69,9 @@ func main() {
   repos := getRepos()
   for i := range repos {
     repo := repos[i]
-    go watchRepo(repo.ID, repo.Directory)
+    repodir := repo.Directory
+    repodir = expandTilde(repo.Directory)
+    go watchRepo(repo.ID, repodir)
   }
 
   code := <-stop
@@ -172,4 +177,32 @@ func informChange(repo string, sub string) {
   } else {
     log.Println("Syncthing is indexing change in "+repo+": "+sub)
   }
+}
+
+func getHomeDir() string {
+  var home string
+  switch runtime.GOOS {
+    case "windows":
+    home = filepath.Join(os.Getenv("HomeDrive"), os.Getenv("HomePath"))
+    if home == "" {
+      home = os.Getenv("UserProfile")
+    }
+    default:
+      home = os.Getenv("HOME")
+  }
+  if home == "" {
+    log.Println("No home directory found - set $HOME (or the platform equivalent).")
+  }
+  return home
+}
+
+func expandTilde(p string) string {
+  if p == "~" {
+    return getHomeDir()
+  }
+  p = filepath.FromSlash(p)
+  if !strings.HasPrefix(p, fmt.Sprintf("~%c", os.PathSeparator)) {
+    return p
+  }
+  return filepath.Join(getHomeDir(), p[2:])
 }
