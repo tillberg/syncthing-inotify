@@ -3,7 +3,6 @@ package main
 
 import (
   "code.google.com/p/go.exp/fsnotify"
-  "fmt"
   "os"
   "bufio"
   "io/ioutil"
@@ -39,6 +38,10 @@ var (
   apiKey    string
 )
 
+// Main
+var (
+	stop = make(chan int)
+)
 
 func main() {
   flag.StringVar(&target, "target", "localhost:8080", "Target")
@@ -66,8 +69,10 @@ func main() {
     go watchRepo(repo.ID, repo.Directory)
   }
 
-  println("Press enter to exit")
-  fmt.Scanln();
+  code := <-stop
+  println("Exiting")
+  os.Exit(code)
+
 }
 
 func getRepos() []RepositoryConfiguration {
