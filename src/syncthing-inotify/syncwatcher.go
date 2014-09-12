@@ -63,12 +63,10 @@ func main() {
   repos := getRepos()
   for i := range repos {
     repo := repos[i]
-    if !repo.ReadOnly {
-      go watchRepo(repo.ID, repo.Directory)
-    }
+    go watchRepo(repo.ID, repo.Directory)
   }
 
-  print("Press enter key to exit")
+  println("Press enter to exit")
   fmt.Scanln();
 }
 
