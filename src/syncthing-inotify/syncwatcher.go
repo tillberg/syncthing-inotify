@@ -103,7 +103,6 @@ func getRepos() []RepositoryConfiguration {
   }
   return cfg.Repositories
 }
- 
 
 func watchRepo(repo string, directory string) {
   sw, err := NewSyncWatcher()
@@ -115,6 +114,7 @@ func watchRepo(repo string, directory string) {
   if err != nil {
     log.Fatal(err)
   }
+  log.Println("Watching "+repo+": "+directory)
   for {
     ev, ok := waitForEvent(sw)
     if ok && ev != nil {
@@ -161,5 +161,7 @@ func informChange(repo string, sub string) {
   defer res.Body.Close()
   if res.StatusCode != 200 {
     log.Fatalf("Status %d != 200 for POST", res.StatusCode)
+  } else {
+    log.Println("Syncthing will index change in "+repo+": "+sub)
   }
 }
