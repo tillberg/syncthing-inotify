@@ -78,6 +78,8 @@ func init() {
 
 func main() {
 
+	testWebGuiPost()
+
 	repos := getRepos()
 	for i := range repos {
 		repo := repos[i]
@@ -129,12 +131,13 @@ func getRepos() []RepositoryConfiguration {
 }
 
 func watchRepo(repo string, directory string) {
+	expandedDirectory := expandTilde(directory)
 	sw, err := NewSyncWatcher()
 	if sw == nil || err != nil {
 		log.Fatal(err)
 	}
 	defer sw.Close()
-	err = sw.Watch(directory)
+	err = sw.Watch(expandedDirectory)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -145,8 +148,8 @@ func watchRepo(repo string, directory string) {
 		if ev == nil {
 			log.Fatal("fsnotify event is nil")
 		}
-	log.Println("Change detected in "+ev.Name)
-	informChangeDebounced(ev.Name)
+		log.Println("Change detected in " + ev.Name)
+		informChangeDebounced(ev.Name)
 	}
 }
 
@@ -161,6 +164,30 @@ func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
 			log.Fatal(err, eok)
 	}
 	return
+}
+
+func testWebGuiPost() {
+	r, err := http.NewRequest("POST", target+"/rest/404", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(csrfToken) > 0 {
+		r.Header.Set("X-CSRF-Token", csrfToken)
+	}
+	if len(authUser) > 0 {
+		r.SetBasicAuth(authUser, authPass)
+	}
+	if len(apiKey) > 0 {
+		r.Header.Set("X-API-Key", apiKey)
+	}
+	res, err := http.DefaultClient.Do(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 404 {
+		log.Fatalf("Status %d != 404 for POST", res.StatusCode)
+	}
 }
 
 func informChange(repo string, sub string) {
