@@ -121,16 +121,18 @@ func watchRepo(repo string, directory string) {
   }
   log.Println("Watching "+repo+": "+directory)
   for {
-    ev, ok := waitForEvent(sw)
-    if ok && ev != nil {
-      sub := strings.TrimPrefix(ev.Name, directory)
-      sub = strings.TrimPrefix(sub, string(os.PathSeparator))
-      informChange(repo, sub)
+    ev := waitForEvent(sw)
+    if ev == nil {
+      log.Fatal("fsnotify event is nil")
     }
+    sub := strings.TrimPrefix(ev.Name, directory)
+    sub = strings.TrimPrefix(sub, string(os.PathSeparator))
+    informChange(repo, sub)
   }
 }
 
-func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent, ok bool) {
+func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
+  var ok bool
   select {
   case ev, ok = <-sw.Event:
     if !ok {
