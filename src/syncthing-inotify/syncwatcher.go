@@ -132,7 +132,7 @@ func watchRepo(repo string, directory string) {
   if err != nil {
     log.Fatal(err)
   }
-  informChangeDebounced := informChangeDebounce(debounceTimeout, repo, directory)
+  informChangeDebounced := informChangeDebounce(debounceTimeout, repo, directory, dirVsFiles, informChange)
   log.Println("Watching "+repo+": "+directory)
   for {
     ev := waitForEvent(sw)
@@ -187,7 +187,7 @@ func informChange(repo string, sub string) {
 }
 
 
-func informChangeDebounce(interval time.Duration, repo string, repoDirectory string) func(string) {
+func informChangeDebounce(interval time.Duration, repo string, repoDirectory string, dirVsFiles int, callback func(repo string, sub string)) func(string) {
 	debounce := func(f func(paths []string)) func(string) {
 		timer := &time.Timer{}
 		subs := make([]string, 0)
@@ -195,7 +195,6 @@ func informChangeDebounce(interval time.Duration, repo string, repoDirectory str
 			timer.Stop()
 			subs = append(subs, sub)
 			timer = time.AfterFunc(interval, func() {
-				fmt.Println("After: ",subs)
 				f(subs)
 				subs = make([]string, 0)
 			})
@@ -208,13 +207,12 @@ func informChangeDebounce(interval time.Duration, repo string, repoDirectory str
 		// This function optimises tracking in two ways:
 		//   - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 		//   - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
+		if (len(paths) == 0) { return }
 		trackedPaths := make(map[string]int) // Map directories to scores; if score == -1 the path is a filename
 		sort.Strings(paths) // Make sure parent paths are processed first
 		for i := range paths {
 			path := paths[i]
-			dir := filepath.Dir(path + string(os.PathSeparator))
-			println("DIR: "+dir)
-			println("CLEAN: "+filepath.Clean(path))
+			dir := filepath.Dir(path)
 			score := 1 // File change counts for 1 per directory
 			if dir == filepath.Clean(path) {
 				score = dirVsFiles // Is directory itself, should definitely inform
@@ -232,24 +230,21 @@ func informChangeDebounce(interval time.Duration, repo string, repoDirectory str
 			}
 			trackedPaths[path] = -1
 		}
-		previousPath := "."
 		var keys []string
 		for k := range trackedPaths {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys) // Sort directories before their own files
+		previousDone, previousPath := false, ""
 		for i := range keys {
 			trackedPath := keys[i]
 			trackedPathScore, _ := trackedPaths[trackedPath]
-			fmt.Println("If1 ",trackedPath)
-			if strings.Contains(trackedPath, previousPath) { continue } // Already informed parent directory change
-			fmt.Println("If2 ",trackedPath)
-			if trackedPathScore <= dirVsFiles && trackedPathScore != -1 { continue } // Not enough files for this directory or it is a file
-			previousPath = trackedPath
-			fmt.Println("Informing ",trackedPath)
+			if previousDone && strings.Contains(trackedPath, previousPath) { continue } // Already informed parent directory change
+			if trackedPathScore < dirVsFiles && trackedPathScore != -1 { continue } // Not enough files for this directory or it is a file
+			previousDone, previousPath = true, trackedPath
 			sub := strings.TrimPrefix(trackedPath, repoDirectory)
 			sub = strings.TrimPrefix(sub, string(os.PathSeparator))
-			informChange(repo, sub)
+			callback(repo, sub)
 		}
 	})
 }
