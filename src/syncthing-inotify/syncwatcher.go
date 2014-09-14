@@ -10,11 +10,13 @@ import (
   "encoding/json"
   "log"
   "fmt"
+  "time"
   "flag"
   "runtime"
   "path/filepath"
   "net/url"
   "strings"
+  "sort"
 )
 
 
@@ -31,7 +33,7 @@ type RepositoryConfiguration struct {
 }
 
 
-// HTTP Parameters
+// HTTP Authentication
 var (
   target    string
   authUser  string
@@ -39,6 +41,12 @@ var (
   csrfToken string
   csrfFile  string
   apiKey    string
+)
+
+// HTTP Debounce
+var (
+	debounceTimeout = 300*time.Millisecond
+	dirVsFiles = 10
 )
 
 // Main
@@ -124,15 +132,15 @@ func watchRepo(repo string, directory string) {
   if err != nil {
     log.Fatal(err)
   }
+  informChangeDebounced := informChangeDebounce(debounceTimeout, repo, directory)
   log.Println("Watching "+repo+": "+directory)
   for {
     ev := waitForEvent(sw)
     if ev == nil {
       log.Fatal("fsnotify event is nil")
     }
-    sub := strings.TrimPrefix(ev.Name, directory)
-    sub = strings.TrimPrefix(sub, string(os.PathSeparator))
-    informChange(repo, sub)
+	println("Event: "+ev.Name)
+	informChangeDebounced(ev.Name)
   }
 }
 
@@ -150,7 +158,6 @@ func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
 }
 
 func informChange(repo string, sub string) {
-  log.Println("Change detected in "+repo+": "+sub)
   data := url.Values {}
   data.Set("repo", repo)
   data.Set("sub", sub)
@@ -177,6 +184,74 @@ func informChange(repo string, sub string) {
   } else {
     log.Println("Syncthing is indexing change in "+repo+": "+sub)
   }
+}
+
+
+func informChangeDebounce(interval time.Duration, repo string, repoDirectory string) func(string) {
+	debounce := func(f func(paths []string)) func(string) {
+		timer := &time.Timer{}
+		subs := make([]string, 0)
+		return func(sub string) {
+			timer.Stop()
+			subs = append(subs, sub)
+			timer = time.AfterFunc(interval, func() {
+				fmt.Println("After: ",subs)
+				f(subs)
+				subs = make([]string, 0)
+			})
+		}
+	}
+  
+	return debounce(func(paths []string) {
+		// Do not inform Syncthing immediately but wait for debounce
+		// Therefore, we need to keep track of the paths that were changed
+		// This function optimises tracking in two ways:
+		//   - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
+		//   - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
+		trackedPaths := make(map[string]int) // Map directories to scores; if score == -1 the path is a filename
+		sort.Strings(paths) // Make sure parent paths are processed first
+		for i := range paths {
+			path := paths[i]
+			dir := filepath.Dir(path + string(os.PathSeparator))
+			println("DIR: "+dir)
+			println("CLEAN: "+filepath.Clean(path))
+			score := 1 // File change counts for 1 per directory
+			if dir == filepath.Clean(path) {
+				score = dirVsFiles // Is directory itself, should definitely inform
+			}
+			// Search for existing parent directory relations in the map
+			for trackedPath, _ := range trackedPaths {
+				if strings.Contains(dir, trackedPath) {
+					// Increment score of tracked current/parent directory
+					trackedPaths[trackedPath] += score
+				}
+			}
+			_, exists := trackedPaths[dir]
+			if !exists {
+				trackedPaths[dir] = score
+			}
+			trackedPaths[path] = -1
+		}
+		previousPath := "."
+		var keys []string
+		for k := range trackedPaths {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys) // Sort directories before their own files
+		for i := range keys {
+			trackedPath := keys[i]
+			trackedPathScore, _ := trackedPaths[trackedPath]
+			fmt.Println("If1 ",trackedPath)
+			if strings.Contains(trackedPath, previousPath) { continue } // Already informed parent directory change
+			fmt.Println("If2 ",trackedPath)
+			if trackedPathScore <= dirVsFiles && trackedPathScore != -1 { continue } // Not enough files for this directory or it is a file
+			previousPath = trackedPath
+			fmt.Println("Informing ",trackedPath)
+			sub := strings.TrimPrefix(trackedPath, repoDirectory)
+			sub = strings.TrimPrefix(sub, string(os.PathSeparator))
+			informChange(repo, sub)
+		}
+	})
 }
 
 func getHomeDir() string {
