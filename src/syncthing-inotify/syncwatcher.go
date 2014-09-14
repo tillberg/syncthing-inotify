@@ -276,7 +276,8 @@ func informChangeDebounce(interval time.Duration, repo string, repoDirectory str
 			trackedPathScore, _ := trackedPaths[trackedPath]
 			if previousDone && strings.Contains(trackedPath, previousPath) { continue } // Already informed parent directory change
 			if trackedPathScore < dirVsFiles && trackedPathScore != -1 { continue } // Not enough files for this directory or it is a file
-			previousDone, previousPath = true, trackedPath
+			previousDone = trackedPathScore != -1
+			previousPath = trackedPath
 			sub := strings.TrimPrefix(trackedPath, repoDirectory)
 			sub = strings.TrimPrefix(sub, string(os.PathSeparator))
 			callback(repo, sub)
