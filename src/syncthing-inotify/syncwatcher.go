@@ -7,6 +7,8 @@ import (
   "bufio"
   "io/ioutil"
   "net/http"
+  "net/url"
+  "crypto/tls"
   "encoding/json"
   "log"
   "fmt"
@@ -14,7 +16,6 @@ import (
   "flag"
   "runtime"
   "path/filepath"
-  "net/url"
   "strings"
   "sort"
 )
@@ -54,14 +55,14 @@ var (
 	stop = make(chan int)
 )
 
-func main() {
+func init() {
   flag.StringVar(&target, "target", "localhost:8080", "Target")
   flag.StringVar(&authUser, "user", "", "Username")
   flag.StringVar(&authPass, "pass", "", "Password")
   flag.StringVar(&csrfFile, "csrf", "", "CSRF token file")
   flag.StringVar(&apiKey, "api", "", "API key")
   flag.Parse()
-
+  if !strings.Contains(target, "://") { target = "http://" + target }  
   if len(csrfFile) > 0 {
     fd, err := os.Open(csrfFile)
     if err != nil {
@@ -73,6 +74,9 @@ func main() {
     }
     fd.Close()
   }
+}
+
+func main() {
 
   repos := getRepos()
   for i := range repos {
@@ -89,7 +93,7 @@ func main() {
 }
 
 func getRepos() []RepositoryConfiguration {
-  r, err := http.NewRequest("GET", "http://"+target+"/rest/config", nil)
+  r, err := http.NewRequest("GET", target+"/rest/config", nil)
   if err != nil {
     log.Fatal(err)
   }
@@ -102,7 +106,9 @@ func getRepos() []RepositoryConfiguration {
   if len(apiKey) > 0 {
     r.Header.Set("X-API-Key", apiKey)
   }
-  res, err := http.DefaultClient.Do(r)
+  tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
+  client := &http.Client{Transport: tr, Timeout: 5*time.Second}
+  res, err := client.Do(r)
   if err != nil {
     log.Fatal(err)
   }
@@ -161,7 +167,7 @@ func informChange(repo string, sub string) {
   data := url.Values {}
   data.Set("repo", repo)
   data.Set("sub", sub)
-  r, err := http.NewRequest("POST", "http://"+target+"/rest/scan?"+data.Encode(), nil)
+  r, err := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
   if err != nil {
     log.Fatal(err)
   }
@@ -174,7 +180,9 @@ func informChange(repo string, sub string) {
   if len(apiKey) > 0 {
     r.Header.Set("X-API-Key", apiKey)
   }
-  res, err := http.DefaultClient.Do(r)
+  tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
+  client := &http.Client{Transport: tr, Timeout: 5*time.Second}
+  res, err := client.Do(r)
   if err != nil {
     log.Fatal(err)
   }
