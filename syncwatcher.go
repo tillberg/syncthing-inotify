@@ -134,19 +134,19 @@ func watchRepo(repo string, directory string) {
 	expandedDirectory := expandTilde(directory)
 	sw, err := NewSyncWatcher()
 	if sw == nil || err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	defer sw.Close()
 	err = sw.Watch(expandedDirectory)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	informChangeDebounced := informChangeDebounce(debounceTimeout, repo, directory, dirVsFiles, informChange)
 	log.Println("Watching " + repo + ": " + directory)
 	for {
 		ev := waitForEvent(sw)
 		if ev == nil {
-			log.Fatal("fsnotify event is nil")
+			log.Println("Error: fsnotify event is nil")
 		}
 		log.Println("Change detected in " + ev.Name)
 		informChangeDebounced(ev.Name)
@@ -158,10 +158,10 @@ func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
 	select {
 		case ev, ok = <-sw.Event:
 			if !ok {
-				log.Fatal("Event: channel closed")
+				log.Println("Error: channel closed")
 			}
 		case err, eok := <-sw.Error:
-			log.Fatal(err, eok)
+			log.Println(err, eok)
 	}
 	return
 }
@@ -188,7 +188,7 @@ func testWebGuiPost() {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 404 {
-		log.Fatalf("Status %d != 404 for POST", res.StatusCode)
+		log.Fatalf("Status %d != 404 for POST\n", res.StatusCode)
 	}
 }
 
@@ -198,7 +198,7 @@ func informChange(repo string, sub string) {
 	data.Set("sub", sub)
 	r, err := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	if len(csrfToken) > 0 {
 		r.Header.Set("X-CSRF-Token", csrfToken)
@@ -213,11 +213,11 @@ func informChange(repo string, sub string) {
 	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
 	res, err := client.Do(r)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		log.Fatalf("Status %d != 200 for POST", res.StatusCode)
+		log.Printf("Error: Status %d != 200 for POST.\n" + repo + ": " + sub, res.StatusCode)
 	} else {
 		log.Println("Syncthing is indexing change in " + repo + ": " + sub)
 	}
