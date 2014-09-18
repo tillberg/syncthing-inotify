@@ -180,7 +180,9 @@ func testWebGuiPost() {
 	if len(apiKey) > 0 {
 		r.Header.Set("X-API-Key", apiKey)
 	}
-	res, err := http.DefaultClient.Do(r)
+	tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
+	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
+	res, err := client.Do(r)
 	if err != nil {
 		log.Fatal(err)
 	}
