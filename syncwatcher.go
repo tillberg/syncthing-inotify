@@ -135,11 +135,13 @@ func watchRepo(repo string, directory string) {
 	sw, err := NewSyncWatcher()
 	if sw == nil || err != nil {
 		log.Println(err)
+		return
 	}
 	defer sw.Close()
 	err = sw.Watch(expandedDirectory)
 	if err != nil {
 		log.Println(err)
+		return
 	}
 	informChangeDebounced := informChangeDebounce(debounceTimeout, repo, directory, dirVsFiles, informChange)
 	log.Println("Watching " + repo + ": " + directory)
@@ -147,6 +149,7 @@ func watchRepo(repo string, directory string) {
 		ev := waitForEvent(sw)
 		if ev == nil {
 			log.Println("Error: fsnotify event is nil")
+			continue
 		}
 		log.Println("Change detected in " + ev.Name)
 		informChangeDebounced(ev.Name)
@@ -199,6 +202,7 @@ func informChange(repo string, sub string) {
 	r, err := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
 	if err != nil {
 		log.Println(err)
+		return
 	}
 	if len(csrfToken) > 0 {
 		r.Header.Set("X-CSRF-Token", csrfToken)
@@ -214,10 +218,11 @@ func informChange(repo string, sub string) {
 	res, err := client.Do(r)
 	if err != nil {
 		log.Println(err)
+		return
 	}
-	defer res.Body.Close()
 	if res.StatusCode != 200 {
 		log.Printf("Error: Status %d != 200 for POST.\n" + repo + ": " + sub, res.StatusCode)
+		return
 	} else {
 		log.Println("Syncthing is indexing change in " + repo + ": " + sub)
 	}
