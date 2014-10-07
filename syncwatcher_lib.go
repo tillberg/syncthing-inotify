@@ -153,7 +153,7 @@ func (w *SyncWatcher) watch(path string) error {
 	w.pathMutex.Lock()
 	defer w.pathMutex.Unlock()
 
-	filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
 			err = w.watcher.Watch(path)
 			if err == nil {
@@ -168,8 +168,6 @@ func (w *SyncWatcher) watch(path string) error {
 		}
 		return err
 	})
-
-	return nil
 }
 
 func (w *SyncWatcher) Watch(path string) error {
