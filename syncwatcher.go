@@ -23,13 +23,13 @@ import (
 
 type Configuration struct {
 	Version			int
-	Repositories	[]RepositoryConfiguration
+	Folders			[]FolderConfiguration
 }
 
-type RepositoryConfiguration struct {
-	ID					string
-	Directory			string
-	ReadOnly			bool
+type FolderConfiguration struct {
+	ID			string
+	Path			string
+	ReadOnly		bool
 	RescanIntervalS		int
 }
 
@@ -80,12 +80,12 @@ func main() {
 
 	testWebGuiPost()
 
-	repos := getRepos()
-	for i := range repos {
-		repo := repos[i]
-		repodir := repo.Directory
-		repodir = expandTilde(repo.Directory)
-		go watchRepo(repo.ID, repodir)
+	folders := getFolders()
+	for i := range folders {
+		folder := folders[i]
+		folderdir := folder.Path
+		folderdir = expandTilde(folder.Path)
+		go watchRepo(folder.ID, folderdir)
 	}
 
 	code := <-stop
@@ -94,7 +94,7 @@ func main() {
 
 }
 
-func getRepos() []RepositoryConfiguration {
+func getFolders() []FolderConfiguration {
 	r, err := http.NewRequest("GET", target+"/rest/config", nil)
 	if err != nil {
 		log.Fatal(err)
@@ -127,24 +127,24 @@ func getRepos() []RepositoryConfiguration {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return cfg.Repositories
+	return cfg.Folders
 }
 
-func watchRepo(repo string, directory string) {
-	expandedDirectory := expandTilde(directory)
+func watchRepo(folder string, path string) {
+	expandedPath := expandTilde(path)
 	sw, err := NewSyncWatcher()
 	if sw == nil || err != nil {
 		log.Println(err)
 		return
 	}
 	defer sw.Close()
-	err = sw.Watch(expandedDirectory)
+	err = sw.Watch(expandedPath)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	informChangeDebounced := informChangeDebounce(debounceTimeout, repo, directory, dirVsFiles, informChange)
-	log.Println("Watching " + repo + ": " + directory)
+	informChangeDebounced := informChangeDebounce(debounceTimeout, folder, path, dirVsFiles, informChange)
+	log.Println("Watching " + folder + ": " + path)
 	for {
 		ev := waitForEvent(sw)
 		if ev == nil {
@@ -195,9 +195,9 @@ func testWebGuiPost() {
 	}
 }
 
-func informChange(repo string, sub string) {
+func informChange(folder string, sub string) {
 	data := url.Values {}
-	data.Set("repo", repo)
+	data.Set("folder", folder)
 	data.Set("sub", sub)
 	r, err := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
 	if err != nil {
@@ -221,15 +221,15 @@ func informChange(repo string, sub string) {
 		return
 	}
 	if res.StatusCode != 200 {
-		log.Printf("Error: Status %d != 200 for POST.\n" + repo + ": " + sub, res.StatusCode)
+		log.Printf("Error: Status %d != 200 for POST.\n" + folder + ": " + sub, res.StatusCode)
 		return
 	} else {
-		log.Println("Syncthing is indexing change in " + repo + ": " + sub)
+		log.Println("Syncthing is indexing change in " + folder + ": " + sub)
 	}
 }
 
 
-func informChangeDebounce(interval time.Duration, repo string, repoDirectory string, dirVsFiles int, callback func(repo string, sub string)) func(string) {
+func informChangeDebounce(interval time.Duration, folder string, folderPath string, dirVsFiles int, callback func(folder string, sub string)) func(string) {
 	debounce := func(f func(paths []string)) func(string) {
 		timer := &time.Timer{}
 		subs := make([]string, 0)
@@ -285,9 +285,9 @@ func informChangeDebounce(interval time.Duration, repo string, repoDirectory str
 			if trackedPathScore < dirVsFiles && trackedPathScore != -1 { continue } // Not enough files for this directory or it is a file
 			previousDone = trackedPathScore != -1
 			previousPath = trackedPath
-			sub := strings.TrimPrefix(trackedPath, repoDirectory)
+			sub := strings.TrimPrefix(trackedPath, folderPath)
 			sub = strings.TrimPrefix(sub, string(os.PathSeparator))
-			callback(repo, sub)
+			callback(folder, sub)
 		}
 	})
 }
@@ -304,7 +304,7 @@ func getHomeDir() string {
 			home = os.Getenv("HOME")
 	}
 	if home == "" {
-		log.Fatal("No home directory found - set $HOME (or the platform equivalent).")
+		log.Fatal("No home path found - set $HOME (or the platform equivalent).")
 	}
 	return home
 }
