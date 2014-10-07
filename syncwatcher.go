@@ -255,8 +255,13 @@ func informChangeDebounce(interval time.Duration, folder string, folderPath stri
 		if (len(paths) == 0) { return }
 		trackedPaths := make(map[string]int) // Map directories to scores; if score == -1 the path is a filename
 		sort.Strings(paths) // Make sure parent paths are processed first
+		previousPath := "" // Filter duplicates
 		for i := range paths {
 			path := paths[i]
+			if (path == previousPath) {
+				continue
+			}
+			previousPath = path
 			dir := filepath.Dir(path)
 			score := 1 // File change counts for 1 per directory
 			if dir == filepath.Clean(path) {
