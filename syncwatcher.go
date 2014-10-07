@@ -85,10 +85,7 @@ func main() {
 		log.Fatal("No folders found");
 	}
 	for i := range folders {
-		folder := folders[i]
-		folderdir := folder.Path
-		folderdir = expandTilde(folder.Path)
-		go watchRepo(folder.ID, folderdir)
+		go watchFolder(folders[i])
 	}
 
 	code := <-stop
@@ -133,21 +130,24 @@ func getFolders() []FolderConfiguration {
 	return cfg.Folders
 }
 
-func watchRepo(folder string, path string) {
-	expandedPath := expandTilde(path)
+func watchFolder(folder FolderConfiguration) {
+	path := expandTilde(folder.Path)
 	sw, err := NewSyncWatcher()
 	if sw == nil || err != nil {
 		log.Println(err)
 		return
 	}
 	defer sw.Close()
-	err = sw.Watch(expandedPath)
+	err = sw.Watch(path)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	informChangeDebounced := informChangeDebounce(debounceTimeout, folder, path, dirVsFiles, informChange)
-	log.Println("Watching " + folder + ": " + path)
+	informChangeDebounced := informChangeDebounce(debounceTimeout, folder.ID, path, dirVsFiles, informChange)
+	log.Println("Watching " + folder.ID + ": " + path)
+	if folder.RescanIntervalS < 1800 {
+		log.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
+	}
 	for {
 		ev := waitForEvent(sw)
 		if ev == nil {
