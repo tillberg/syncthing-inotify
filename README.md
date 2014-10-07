@@ -1,3 +1,4 @@
+#### Building
 1. Build syncthing-inotify
  ```
 # To clone
@@ -15,3 +16,8 @@ go build
 ./syncthing-inotify -api="..."
 ```
 
+
+#### Troubleshooting
+* When watching many files, the OS might not have enough inotify handles available and the app exists with the message:```no space left on device```
+
+  Fix: ```sudo sh -c 'echo 16384 > /proc/sys/fs/inotify/max_user_watches'```
