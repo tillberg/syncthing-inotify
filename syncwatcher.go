@@ -81,6 +81,9 @@ func main() {
 	testWebGuiPost()
 
 	folders := getFolders()
+	if (len(folders) == 0) {
+		log.Fatal("No folders found");
+	}
 	for i := range folders {
 		folder := folders[i]
 		folderdir := folder.Path
