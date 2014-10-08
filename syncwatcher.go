@@ -186,6 +186,7 @@ func testWebGuiPost() {
 	if len(apiKey) > 0 {
 		r.Header.Set("X-API-Key", apiKey)
 	}
+	r.Close = true
 	tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
 	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
 	res, err := client.Do(r)
@@ -216,6 +217,7 @@ func informChange(folder string, sub string) {
 	if len(apiKey) > 0 {
 		r.Header.Set("X-API-Key", apiKey)
 	}
+	r.Close = true
 	tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
 	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
 	res, err := client.Do(r)
