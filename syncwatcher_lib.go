@@ -30,13 +30,14 @@ type SyncWatcher struct {
 	Error chan error
 	Event chan *fsnotify.FileEvent
 
-	watcher   *fsnotify.Watcher
-	paths     map[string]string
-	roots     map[string]int
-	pathMutex *sync.Mutex
+	watcher   	*fsnotify.Watcher
+	paths     	map[string]string
+	ignorePaths 	[]string
+	roots     	map[string]int
+	pathMutex 	*sync.Mutex
 }
 
-func NewSyncWatcher() (*SyncWatcher, error) {
+func NewSyncWatcher(ignorePaths []string) (*SyncWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -47,6 +48,7 @@ func NewSyncWatcher() (*SyncWatcher, error) {
 		make(chan *fsnotify.FileEvent),
 		watcher,
 		make(map[string]string),
+		ignorePaths,
 		make(map[string]int),
 		&sync.Mutex{},
 	}
@@ -155,6 +157,11 @@ func (w *SyncWatcher) watch(path string) error {
 
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
+			for _, ignorePath := range ignorePaths {
+				if strings.Contains(path, ignorePath) {
+					return err
+				}
+			}
 			err = w.watcher.Watch(path)
 			if err == nil {
 				w.paths[path] = ""

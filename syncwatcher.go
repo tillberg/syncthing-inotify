@@ -53,6 +53,7 @@ var (
 // Main
 var (
 	stop = make(chan int)
+	ignorePaths = []string{".stversions", ".syncthing."}
 )
 
 func init() {
@@ -132,7 +133,7 @@ func getFolders() []FolderConfiguration {
 
 func watchFolder(folder FolderConfiguration) {
 	path := expandTilde(folder.Path)
-	sw, err := NewSyncWatcher()
+	sw, err := NewSyncWatcher(ignorePaths)
 	if sw == nil || err != nil {
 		log.Println(err)
 		return
