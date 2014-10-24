@@ -20,7 +20,7 @@ func init() {
 }
 
 func newSW(t *testing.T) (sw *SyncWatcher) {
-	sw, err := NewSyncWatcher()
+	sw, err := NewSyncWatcher([]string{})
 	if sw == nil || err != nil {
 		t.Error("NewSyncWatcher failed:", err)
 	}
@@ -125,7 +125,7 @@ func TestWatchFiles(t *testing.T) {
 		t.Error("Expected file rename event, got: "+ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
-	if !ok || !ev.IsRename() || ev.Name != file2 {
+	if !ok || !ev.IsCreate() || ev.Name != file2 {
 		t.Error("Expected file create event, got: "+ev.String())
 	}
 
@@ -200,7 +200,7 @@ func TestRecursiveWatch(t *testing.T) {
 		t.Error("Expected directory rename event, got: "+ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
-	if !ok || !ev.IsRename() || ev.Name != dir2 {
+	if !ok || !ev.IsCreate() || ev.Name != dir2 {
 		t.Error("Expected directory create event for "+dir2+", got: "+ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
