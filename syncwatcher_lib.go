@@ -155,21 +155,21 @@ func (w *SyncWatcher) watch(path string) error {
 	w.pathMutex.Lock()
 	defer w.pathMutex.Unlock()
 
-	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
 			for _, ignorePath := range ignorePaths {
-				if strings.Contains(path, ignorePath) {
+				if strings.Contains(p, ignorePath) {
 					return err
 				}
 			}
-			err = w.watcher.Watch(path)
+			err = w.watcher.Watch(p)
 			if err == nil {
-				w.paths[path] = ""
-				parent := filepath.Dir(path)
+				w.paths[p] = ""
+				parent := filepath.Dir(p)
 				if _, ok := w.paths[parent]; ok {
 					// Record the directory structure so that it can be
 					// walked again when we need to remove the watches.
-					w.paths[parent] += filepath.Base(path) + "\000"
+					w.paths[parent] += filepath.Base(p) + "\000"
 				}
 			}
 		}
