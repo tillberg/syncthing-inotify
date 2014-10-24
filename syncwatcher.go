@@ -272,7 +272,7 @@ func informChangeDebounce(interval time.Duration, folder string, folderPath stri
 			}
 			// Search for existing parent directory relations in the map
 			for trackedPath, _ := range trackedPaths {
-				if strings.Contains(dir, trackedPath) {
+				if strings.HasPrefix(dir, trackedPath) {
 					// Increment score of tracked current/parent directory
 					trackedPaths[trackedPath] += score
 				}
@@ -292,7 +292,7 @@ func informChangeDebounce(interval time.Duration, folder string, folderPath stri
 		for i := range keys {
 			trackedPath := keys[i]
 			trackedPathScore, _ := trackedPaths[trackedPath]
-			if previousDone && strings.Contains(trackedPath, previousPath) { continue } // Already informed parent directory change
+			if previousDone && strings.HasPrefix(trackedPath, previousPath) { continue } // Already informed parent directory change
 			if trackedPathScore < dirVsFiles && trackedPathScore != -1 { continue } // Not enough files for this directory or it is a file
 			previousDone = trackedPathScore != -1
 			previousPath = trackedPath
