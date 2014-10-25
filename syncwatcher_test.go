@@ -206,33 +206,3 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 		t.Error("Callback not correctly triggered")
 	}
 }
-
-func TestDebouncedParentDirectoryWatch6(t *testing.T) {
-	// Convert a/b a/c file1 file2 file3 to _ (main folder)
-	testOK := false
-	testRepo := "Temp"
-	testDirectory := getHomeDir() + slash + "Sync"
-	testFiles := [...]string{
-		testDirectory,
-		testDirectory,
-		testDirectory + slash + ".gitignore",
-		testDirectory + slash + "HISTORY_en.TXT",
-		testDirectory + slash + "HISTORY_en.TXT",
-		testDirectory + slash }
-	testDebounceTimeout := 20 * time.Millisecond
-	testDirVsFiles := 3
-	fileChange := func(repo string, sub string) {
-		if repo != testRepo || sub != testDirectory {
-			t.Error("Invalid result for directory change: " + repo + ": " + sub)
-		}
-		testOK = true
-	}
-	informChangeDebounced := informChangeDebounce(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, fileChange)
-	for i := range testFiles {
-		informChangeDebounced(testFiles[i])
-	}
-	time.Sleep(testDebounceTimeout*2)
-	if !testOK {
-		t.Error("Callback not correctly triggered")
-	}
-}
