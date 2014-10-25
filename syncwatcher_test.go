@@ -236,5 +236,3 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 		t.Error("Callback not correctly triggered")
 	}
 }
-
-

@@ -30,13 +30,14 @@ type SyncWatcher struct {
 	Error chan error
 	Event chan *fsnotify.FileEvent
 
-	watcher   *fsnotify.Watcher
-	paths     map[string]string
-	roots     map[string]int
-	pathMutex *sync.Mutex
+	watcher   	*fsnotify.Watcher
+	paths     	map[string]string
+	ignorePaths 	[]string
+	roots     	map[string]int
+	pathMutex 	*sync.Mutex
 }
 
-func NewSyncWatcher() (*SyncWatcher, error) {
+func NewSyncWatcher(ignorePaths []string) (*SyncWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -47,6 +48,7 @@ func NewSyncWatcher() (*SyncWatcher, error) {
 		make(chan *fsnotify.FileEvent),
 		watcher,
 		make(map[string]string),
+		ignorePaths,
 		make(map[string]int),
 		&sync.Mutex{},
 	}
@@ -153,16 +155,21 @@ func (w *SyncWatcher) watch(path string) error {
 	w.pathMutex.Lock()
 	defer w.pathMutex.Unlock()
 
-	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
-			err = w.watcher.Watch(path)
+			for _, ignorePath := range ignorePaths {
+				if strings.Contains(p, ignorePath) {
+					return err
+				}
+			}
+			err = w.watcher.Watch(p)
 			if err == nil {
-				w.paths[path] = ""
-				parent := filepath.Dir(path)
+				w.paths[p] = ""
+				parent := filepath.Dir(p)
 				if _, ok := w.paths[parent]; ok {
 					// Record the directory structure so that it can be
 					// walked again when we need to remove the watches.
-					w.paths[parent] += filepath.Base(path) + "\000"
+					w.paths[parent] += filepath.Base(p) + "\000"
 				}
 			}
 		}
