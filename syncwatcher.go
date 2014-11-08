@@ -96,6 +96,44 @@ func main() {
 
 }
 
+func getIgnores(folder string) []string {
+	r, err := http.NewRequest("GET", target+"/rest/ignores?folder="+folder, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(csrfToken) > 0 {
+		r.Header.Set("X-CSRF-Token", csrfToken)
+	}
+	if len(authUser) > 0 {
+		r.SetBasicAuth(authUser, authPass)
+	}
+	if len(apiKey) > 0 {
+		r.Header.Set("X-API-Key", apiKey)
+	}
+	tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
+	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
+	res, err := client.Do(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("Status %d != 200 for GET", res.StatusCode)
+	}
+	bs, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var ignores map[string][]string
+	err = json.Unmarshal(bs, &ignores)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return ignores["ignore"]
+}
+
+
+
 func getFolders() []FolderConfiguration {
 	r, err := http.NewRequest("GET", target+"/rest/config", nil)
 	if err != nil {
@@ -134,6 +172,7 @@ func getFolders() []FolderConfiguration {
 
 func watchFolder(folder FolderConfiguration) {
 	path := expandTilde(folder.Path)
+	ignorePaths := append(ignorePaths, getIgnores(folder.ID)...)
 	sw, err := NewSyncWatcher(ignorePaths)
 	if sw == nil || err != nil {
 		log.Println(err)
