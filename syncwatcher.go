@@ -48,6 +48,7 @@ var (
 var (
 	debounceTimeout = 300*time.Millisecond
 	dirVsFiles = 10
+	maxFiles = 5000
 )
 
 // Main
@@ -144,7 +145,8 @@ func watchFolder(folder FolderConfiguration) {
 		log.Println(err)
 		return
 	}
-	informChangeDebounced := informChangeDebounce(debounceTimeout, folder.ID, path, dirVsFiles, informChange)
+	informChannel := make(chan string, 10)
+	go informChangeAccumulator(debounceTimeout, folder.ID, path, dirVsFiles, informChannel, informChange)
 	log.Println("Watching " + folder.ID + ": " + path)
 	if folder.RescanIntervalS < 1800 {
 		log.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
@@ -156,7 +158,7 @@ func watchFolder(folder FolderConfiguration) {
 			continue
 		}
 		log.Println("Change detected in " + ev.Name)
-		informChangeDebounced(ev.Name)
+		informChannel <- ev.Name
 	}
 }
 
@@ -173,10 +175,11 @@ func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
 	return
 }
 
-func testWebGuiPost() {
+func testWebGuiPost() (bool) {
 	r, err := http.NewRequest("POST", target+"/rest/404", nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Cannot connect to Syncthing", err)
+		return false
 	}
 	if len(csrfToken) > 0 {
 		r.Header.Set("X-CSRF-Token", csrfToken)
@@ -192,22 +195,25 @@ func testWebGuiPost() {
 	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
 	res, err := client.Do(r)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Cannot connect to Syncthing", err)
+		return false
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 404 {
-		log.Fatalf("Status %d != 404 for POST\n", res.StatusCode)
+		log.Printf("Cannot connect to Syncthing, Status %d != 404 for POST\n", res.StatusCode)
+		return false
 	}
+	return true
 }
 
-func informChange(folder string, sub string) {
+func informChange(folder string, sub string) (bool) {
 	data := url.Values {}
 	data.Set("folder", folder)
 	data.Set("sub", sub)
 	r, err := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
 	if err != nil {
 		log.Println(err)
-		return
+		return false
 	}
 	if len(csrfToken) > 0 {
 		r.Header.Set("X-CSRF-Token", csrfToken)
@@ -223,39 +229,50 @@ func informChange(folder string, sub string) {
 	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
 	res, err := client.Do(r)
 	if err != nil {
-		log.Println(err)
-		return
+		log.Println("Syncthing returned error", err)
+		return false
 	}
 	if res.StatusCode != 200 {
 		log.Printf("Error: Status %d != 200 for POST.\n" + folder + ": " + sub, res.StatusCode)
-		return
+		return false
 	} else {
 		log.Println("Syncthing is indexing change in " + folder + ": " + sub)
 	}
+	return true
 }
 
-
-func informChangeDebounce(interval time.Duration, folder string, folderPath string, dirVsFiles int, callback func(folder string, sub string)) func(string) {
-	debounce := func(f func(paths []string)) func(string) {
-		timer := &time.Timer{}
+func informChangeAccumulator(interval time.Duration, folder string, folderPath string, dirVsFiles int, input chan string,
+			callback func(folder string, sub string) (bool)) func(string) {
+	debounce := func(f func(paths []string) (bool)) func(string) {
 		subs := make([]string, 0)
-		return func(sub string) {
-			timer.Stop()
-			subs = append(subs, sub)
-			timer = time.AfterFunc(interval, func() {
-				f(subs)
-				subs = make([]string, 0)
-			})
+		var item = <-input
+		for {
+			select {
+				case item = <-input:
+					if len(subs) < maxFiles {
+						subs = append(subs, item)
+					}
+				case <-time.After(interval):
+					ok := false
+					if len(subs) < maxFiles {
+						ok = f(subs)
+					} else {
+						ok = f([]string{ folderPath })
+					}
+					if ok {
+						subs = make([]string, 0)
+					}
+			}
 		}
 	}
 	
-	return debounce(func(paths []string) {
+	return debounce(func(paths []string) (bool) {
 		// Do not inform Syncthing immediately but wait for debounce
 		// Therefore, we need to keep track of the paths that were changed
 		// This function optimises tracking in two ways:
 		//	- If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 		//	- Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
-		if (len(paths) == 0) { return }
+		if (len(paths) == 0) { return false }
 		trackedPaths := make(map[string]int) // Map directories to scores; if score == -1 the path is a filename
 		sort.Strings(paths) // Make sure parent paths are processed first
 		previousPath := "" // Filter duplicates
@@ -298,8 +315,11 @@ func informChangeDebounce(interval time.Duration, folder string, folderPath stri
 			previousPath = trackedPath
 			sub := strings.TrimPrefix(trackedPath, folderPath)
 			sub = strings.TrimPrefix(sub, string(os.PathSeparator))
-			callback(folder, sub)
+			if !callback(folder, sub) {
+				return false
+			}
 		}
+		return true
 	})
 }
 
