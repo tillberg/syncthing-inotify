@@ -59,7 +59,7 @@ var (
 // Main
 var (
 	stop = make(chan int)
-	ignorePaths = []string{".stversions", ".stfolder", ".stignore", ".syncthing."}
+	ignorePaths = []string{".stversions", ".stfolder", ".stignore", ".syncthing", "~syncthing~"}
 )
 
 func init() {
