@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sort"
+	"regexp"
 )
 
 
@@ -33,6 +34,10 @@ type FolderConfiguration struct {
 	RescanIntervalS		int
 }
 
+type Pattern struct {
+	match			*regexp.Regexp
+	include			bool
+}
 
 // HTTP Authentication
 var (
@@ -54,7 +59,7 @@ var (
 // Main
 var (
 	stop = make(chan int)
-	ignorePaths = []string{".stversions", ".syncthing."}
+	ignorePaths = []string{".stversions", ".stfolder", ".stignore", ".syncthing."}
 )
 
 func init() {
@@ -96,7 +101,7 @@ func main() {
 
 }
 
-func getIgnores(folder string) []string {
+func getIgnorePatterns(folder string) []Pattern {
 	r, err := http.NewRequest("GET", target+"/rest/ignores?folder="+folder, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -129,7 +134,17 @@ func getIgnores(folder string) []string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return ignores["ignore"]
+	patterns := make([]Pattern, len(ignores["patterns"]))
+	for i, str := range ignores["patterns"] {
+		pattern := strings.TrimPrefix(str, "(?exclude)")
+		println(pattern)
+		regexp, err := regexp.Compile(pattern)
+		if err != nil {
+			log.Fatal(err)
+		}
+		patterns[i] = Pattern { regexp, str == pattern }
+	}
+	return patterns
 }
 
 
@@ -172,8 +187,8 @@ func getFolders() []FolderConfiguration {
 
 func watchFolder(folder FolderConfiguration) {
 	path := expandTilde(folder.Path)
-	ignorePaths := append(ignorePaths, getIgnores(folder.ID)...)
-	sw, err := NewSyncWatcher(ignorePaths)
+	ignorePatterns := getIgnorePatterns(folder.ID)
+	sw, err := NewSyncWatcher(ignorePaths, ignorePatterns)
 	if sw == nil || err != nil {
 		log.Println(err)
 		return
