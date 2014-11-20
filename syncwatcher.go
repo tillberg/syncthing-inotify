@@ -3,6 +3,7 @@ package main
 
 import (
 	"code.google.com/p/go.exp/fsnotify"
+	"github.com/cenkalti/backoff"
 	"os"
 	"bufio"
 	"io/ioutil"
@@ -79,7 +80,7 @@ func init() {
 
 func main() {
 
-	testWebGuiPost()
+	backoff.Retry(testWebGuiPost, backoff.NewExponentialBackOff())
 
 	folders := getFolders()
 	if (len(folders) == 0) {
@@ -173,10 +174,11 @@ func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
 	return
 }
 
-func testWebGuiPost() {
+func testWebGuiPost() error {
 	r, err := http.NewRequest("POST", target+"/rest/404", nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Failed to create POST Request", err)
+		return err
 	}
 	if len(csrfToken) > 0 {
 		r.Header.Set("X-CSRF-Token", csrfToken)
@@ -192,12 +194,15 @@ func testWebGuiPost() {
 	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
 	res, err := client.Do(r)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Request failed.", err)
+		return err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 404 {
-		log.Fatalf("Status %d != 404 for POST\n", res.StatusCode)
+		log.Printf("Invalid Status (%d != 404) for POST\n", res.StatusCode)
+		return err
 	}
+	return nil
 }
 
 func informChange(folder string, sub string) {
@@ -223,7 +228,7 @@ func informChange(folder string, sub string) {
 	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
 	res, err := client.Do(r)
 	if err != nil {
-		log.Println(err)
+		log.Println("Syncthing returned an error.", err)
 		return
 	}
 	if res.StatusCode != 200 {
