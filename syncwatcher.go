@@ -139,7 +139,6 @@ func getIgnorePatterns(folder string) []Pattern {
 	patterns := make([]Pattern, len(ignores["patterns"]))
 	for i, str := range ignores["patterns"] {
 		pattern := strings.TrimPrefix(str, "(?exclude)")
-		println(pattern)
 		regexp, err := regexp.Compile(pattern)
 		if err != nil {
 			log.Fatal(err)
@@ -190,7 +189,7 @@ func getFolders() []FolderConfiguration {
 func watchFolder(folder FolderConfiguration) {
 	path := expandTilde(folder.Path)
 	ignorePatterns := getIgnorePatterns(folder.ID)
-	sw, err := NewSyncWatcher(ignorePaths, ignorePatterns)
+	sw, err := NewSyncWatcher(path, ignorePaths, ignorePatterns)
 	if sw == nil || err != nil {
 		log.Println(err)
 		return
@@ -213,6 +212,9 @@ func watchFolder(folder FolderConfiguration) {
 			log.Println("Error: fsnotify event is nil")
 			continue
 		}
+		if shouldIgnore(path, ignorePaths, ignorePatterns, ev.Name) {
+			continue
+		}
 		log.Println("Change detected in " + ev.Name)
 		informChannel <- ev.Name
 	}
@@ -229,6 +231,33 @@ func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
 			log.Println(err, eok)
 	}
 	return
+}
+
+func shouldIgnore(folderPath string, ignorePaths []string, ignorePatterns []Pattern, path string) bool {
+	relP := strings.TrimPrefix(path, folderPath)
+	for _, ignorePath := range ignorePaths {
+		if strings.Contains(relP, ignorePath) {
+			return true
+		}
+	}
+	for _, p1 := range ignorePatterns {
+		//println("Testing", relP, "to", p1.match.String())
+		if p1.include && p1.match.MatchString(relP) {
+			keep := false
+			for _, p2 := range ignorePatterns {
+				if !p2.include && p2.match.MatchString(relP) {
+					//println("Keeping", relP, "because", p2.match.String())
+					keep = true
+					break
+				}
+			}
+			if !keep {
+				//println("Ignoring", relP)
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func testWebGuiPost() error {

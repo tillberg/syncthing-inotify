@@ -32,13 +32,14 @@ type SyncWatcher struct {
 
 	watcher   	*fsnotify.Watcher
 	paths     	map[string]string
+	mainPath	string
 	ignorePaths 	[]string
 	ignorePatterns 	[]Pattern
 	roots     	map[string]int
 	pathMutex 	*sync.Mutex
 }
 
-func NewSyncWatcher(ignorePaths []string, ignorePatterns []Pattern) (*SyncWatcher, error) {
+func NewSyncWatcher(mainPath string, ignorePaths []string, ignorePatterns []Pattern) (*SyncWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -49,6 +50,7 @@ func NewSyncWatcher(ignorePaths []string, ignorePatterns []Pattern) (*SyncWatche
 		make(chan *fsnotify.FileEvent),
 		watcher,
 		make(map[string]string),
+		mainPath,
 		ignorePaths,
 		ignorePatterns,
 		make(map[string]int),
@@ -159,24 +161,8 @@ func (w *SyncWatcher) watch(path string) error {
 
 	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
-			for _, ignorePath := range w.ignorePaths {
-				if strings.Contains(p, ignorePath) {
-					return err
-				}
-			}
-			for _, p1 := range w.ignorePatterns {
-				if p1.include && p1.match.MatchString(p) {
-					keep := false
-					for _, p2 := range w.ignorePatterns {
-						if !p2.include && p2.match.MatchString(p) {
-							keep = true
-							break
-						}
-					}
-					if !keep {
-						return err
-					}
-				}
+			if shouldIgnore(w.mainPath, w.ignorePaths, w.ignorePatterns, p) {
+				return err
 			}
 			err = w.watcher.Watch(p)
 			if err == nil {
