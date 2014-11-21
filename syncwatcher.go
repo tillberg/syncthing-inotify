@@ -51,6 +51,11 @@ var (
 	apiKey		string
 )
 
+// HTTP Timeouts
+var (
+	requestTimeout = 30*time.Second
+)
+
 // HTTP Debounce
 var (
 	debounceTimeout = 300*time.Millisecond
@@ -105,25 +110,8 @@ func main() {
 
 func getIgnorePatterns(folder string) []Pattern {
 	r, err := http.NewRequest("GET", target+"/rest/ignores?folder="+folder, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(csrfToken) > 0 {
-		r.Header.Set("X-CSRF-Token", csrfToken)
-	}
-	if len(authUser) > 0 {
-		r.SetBasicAuth(authUser, authPass)
-	}
-	if len(apiKey) > 0 {
-		r.Header.Set("X-API-Key", apiKey)
-	}
-	tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
-	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
-	res, err := client.Do(r)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
+	res, err := performRequest(r)
+	defer func() { if res != nil && res.Body != nil { res.Body.Close() } }()
 	if res.StatusCode != 200 {
 		log.Fatalf("Status %d != 200 for GET", res.StatusCode)
 	}
@@ -152,25 +140,8 @@ func getIgnorePatterns(folder string) []Pattern {
 
 func getFolders() []FolderConfiguration {
 	r, err := http.NewRequest("GET", target+"/rest/config", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(csrfToken) > 0 {
-		r.Header.Set("X-CSRF-Token", csrfToken)
-	}
-	if len(authUser) > 0 {
-		r.SetBasicAuth(authUser, authPass)
-	}
-	if len(apiKey) > 0 {
-		r.Header.Set("X-API-Key", apiKey)
-	}
-	tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
-	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
-	res, err := client.Do(r)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
+	res, err := performRequest(r)
+	defer func() { if res != nil && res.Body != nil { res.Body.Close() } }()
 	if res.StatusCode != 200 {
 		log.Fatalf("Status %d != 200 for GET", res.StatusCode)
 	}
@@ -260,11 +231,9 @@ func shouldIgnore(folderPath string, ignorePaths []string, ignorePatterns []Patt
 	return false
 }
 
-func testWebGuiPost() error {
-	r, err := http.NewRequest("POST", target+"/rest/404", nil)
-	if err != nil {
-		log.Println("Failed to create POST Request", err)
-		return err
+func performRequest(r *http.Request) (*http.Response, error) {
+	if r == nil {
+		return nil, errors.New("Invalid HTTP Request object")
 	}
 	if len(csrfToken) > 0 {
 		r.Header.Set("X-CSRF-Token", csrfToken)
@@ -275,15 +244,26 @@ func testWebGuiPost() error {
 	if len(apiKey) > 0 {
 		r.Header.Set("X-API-Key", apiKey)
 	}
-	r.Close = true
-	tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
-	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		ResponseHeaderTimeout: requestTimeout,
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout: requestTimeout,
+	}
 	res, err := client.Do(r)
+	return res, err
+}
+
+func testWebGuiPost() error {
+	r, err := http.NewRequest("POST", target+"/rest/404", nil)
+	res, err := performRequest(r)
+	defer func() { if res != nil && res.Body != nil { res.Body.Close() } }()
 	if err != nil {
-		log.Println("Cannot connect to Syncthing", err)
+		log.Println("Cannot connect to Syncthing:", err)
 		return err
 	}
-	defer res.Body.Close()
 	if res.StatusCode != 404 {
 		log.Printf("Cannot connect to Syncthing, Status %d != 404 for POST\n", res.StatusCode)
 		return errors.New("Invalid HTTP status code")
@@ -295,26 +275,11 @@ func informChange(folder string, sub string) error {
 	data := url.Values {}
 	data.Set("folder", folder)
 	data.Set("sub", sub)
-	r, err := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
+	r, _ := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
+	res, err := performRequest(r)
+	defer func() { if res != nil && res.Body != nil { res.Body.Close() } }()
 	if err != nil {
-		log.Println(err)
-		return err
-	}
-	if len(csrfToken) > 0 {
-		r.Header.Set("X-CSRF-Token", csrfToken)
-	}
-	if len(authUser) > 0 {
-		r.SetBasicAuth(authUser, authPass)
-	}
-	if len(apiKey) > 0 {
-		r.Header.Set("X-API-Key", apiKey)
-	}
-	r.Close = true
-	tr := &http.Transport{ TLSClientConfig: &tls.Config{InsecureSkipVerify : true} }
-	client := &http.Client{Transport: tr, Timeout: 5*time.Second}
-	res, err := client.Do(r)
-	if err != nil {
-		log.Println("Syncthing returned an error.", err)
+		log.Println("Failed to perform request", err)
 		return err
 	}
 	if res.StatusCode != 200 {
