@@ -59,7 +59,7 @@ var (
 // HTTP Debounce
 var (
 	debounceTimeout = 300*time.Millisecond
-	dirVsFiles = 10
+	dirVsFiles = 100
 	maxFiles = 5000
 )
 
@@ -288,7 +288,9 @@ func informChange(folder string, sub string) error {
 	} else {
 		log.Println("Syncthing is indexing change in " + folder + ": " + sub)
 	}
-	return nil
+	// Wait until scan finishes
+	_, err = ioutil.ReadAll(res.Body)
+	return err
 }
 
 func informChangeAccumulator(interval time.Duration, folder string, folderPath string, dirVsFiles int, input chan string,
