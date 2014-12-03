@@ -3,10 +3,10 @@
  ```
 # To clone
 mkdir -p src/github.com/syncthing
-git clone https://github.com/syncthing/inotify.git src/github.com/syncthing/inotify
+git clone https://github.com/syncthing/syncthing-inotify.git src/github.com/syncthing/syncthing-inotify
 # Following commands are needed every time you want to build (unless you use Golang's specific folder structure: C:\src or ~/src/)
 export GOPATH=$(pwd)
-cd src/github.com/syncthing/inotify
+cd src/github.com/syncthing/syncthing-inotify
 go get
 go build
 ```
@@ -17,7 +17,7 @@ go build
 ```
 
 
-#### Troubleshooting
-* When watching many files, the OS might not have enough inotify handles available and the app exists with the message:```no space left on device```
+#### Troubleshooting (OSX)
+* The Go bindings for inotify do not support recursive watching on OSX. Therefore, when watching many files on OSX, we might not have enough inotify handles available and the app exits with the message:```no space left on device```. This is an [open issue](https://github.com/syncthing/syncthing-inotify/issues/8).
 
-  Fix: ```sudo sh -c 'echo 262144 > /proc/sys/fs/inotify/max_user_watches'```
+  Temporary fix: ```sudo sh -c 'echo 262144 > /proc/sys/fs/inotify/max_user_watches'```
