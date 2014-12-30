@@ -1,4 +1,7 @@
 #!/usr/bin/env ruby
+# If you get the error "go build runtime: <runtime> must be bootstrapped using make.bash", please run:
+# `/bin/bash -ic 'cd $(dirname $(dirname $(which go)))/src && ./make.bash'`
+
 oses = [
   "linux-386", "linux-amd64", "linux-arm-v5", "linux-arm-v7",
   "darwin-386", "darwin-amd64",
@@ -9,6 +12,8 @@ oses = [
 version = `git describe --abbrev=0 --tags`.chomp
 
 oses.each do |os|
+  next if ARGV.count > 0 && !ARGV.include?(os)
+  puts "building #{os}"
   name = "syncthing-inotify"
   newname = "syncthing-inotify-#{os}"
   buildX = ""

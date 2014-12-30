@@ -1,6 +1,6 @@
 #### Building
 1. Build syncthing-inotify
- ```
+```
 # To clone
 mkdir -p src/github.com/syncthing
 git clone https://github.com/syncthing/syncthing-inotify.git src/github.com/syncthing/syncthing-inotify
