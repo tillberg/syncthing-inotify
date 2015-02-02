@@ -23,7 +23,7 @@ func init() {
 }
 
 func newSW(t *testing.T) (sw *SyncWatcher) {
-	sw, err := NewSyncWatcher([]string{})
+	sw, err := NewSyncWatcher("", []string{}, []Pattern{})
 	if sw == nil || err != nil {
 		t.Error("NewSyncWatcher failed:", err)
 	}

@@ -20,15 +20,17 @@ func TestDebouncedFileWatch(t *testing.T) {
 	testFile := "a"+slash+"file1"
 	testDebounceTimeout := 2 * time.Millisecond
 	testDirVsFiles := 10
-	fileChange := func(repo string, sub string) {
+	testChannel := make(chan string, 10)
+	fileChange := func(repo string, sub string) error {
 		if repo != testRepo || sub != testFile {
 			t.Error("Invalid result for file change: "+repo+" "+sub)
 		}
 		testOK = true
+		return nil
 	}
-	informChangeDebounced := informChangeDebounce(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, fileChange)
-	informChangeDebounced(testDirectory+slash+testFile)
-	time.Sleep(testDebounceTimeout*2)
+	go informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	testChannel <- testDirectory+slash+testFile
+	time.Sleep(testDebounceTimeout*10)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
@@ -43,14 +45,16 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 	testFile := "a"+slash
 	testDebounceTimeout := 2 * time.Millisecond
 	testDirVsFiles := 10
-	fileChange := func(repo string, sub string) {
+	testChannel := make(chan string, 10)
+	fileChange := func(repo string, sub string) error {
 		if repo != testRepo || sub+slash != testFile {
 			t.Error("Invalid result for directory change: "+repo+" "+sub)
 		}
 		testOK = true
+		return nil
 	}
-	informChangeDebounced := informChangeDebounce(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, fileChange)
-	informChangeDebounced(testDirectory+slash+testFile)
+	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	informChange(testDirectory+slash+testFile)
 	time.Sleep(testDebounceTimeout*2)
 	if !testOK {
 		t.Error("Callback not triggered")
@@ -66,15 +70,17 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 	testFiles := [...]string{ testChangeDir+"file1.txt", testChangeDir+"file2", testChangeDir+"file3.ogg" }
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 3
-	fileChange := func(repo string, sub string) {
+	testChannel := make(chan string, 10)
+	fileChange := func(repo string, sub string) error {
 		if repo != testRepo || sub != "a" {
 			t.Error("Invalid result for directory change: "+repo+" "+sub)
 		}
 		testOK = true
+		return nil
 	}
-	informChangeDebounced := informChangeDebounce(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, fileChange)
+	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChangeDebounced(testDirectory+slash+testFiles[i])
+		informChange(testDirectory+slash+testFiles[i])
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if !testOK {
@@ -92,7 +98,8 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 	testFiles := [...]string{ testChangeDir1, testChangeDir1+"file1.txt", testChangeDir1+"file2", testChangeDir2, testChangeDir1+"file3.ogg" }
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 3
-	fileChange := func(repo string, sub string) {
+	testChannel := make(chan string, 10)
+	fileChange := func(repo string, sub string) error {
 		if testOK == 0 {
 			if repo != testRepo || sub != "a" {
 				t.Error("Invalid result for directory change 1: "+repo+" "+sub)
@@ -103,10 +110,11 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 			}
 		}
 		testOK += 1
+		return nil
 	}
-	informChangeDebounced := informChangeDebounce(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, fileChange)
+	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChangeDebounced(testDirectory+slash+testFiles[i])
+		informChange(testDirectory+slash+testFiles[i])
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if testOK != 2 {
@@ -125,15 +133,17 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		"a"+slash+"d"+slash+"file3.ogg" }
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 3
-	fileChange := func(repo string, sub string) {
+	testChannel := make(chan string, 10)
+	fileChange := func(repo string, sub string) error {
 		if repo != testRepo || sub != testFiles[testOK] {
 			t.Error("Invalid result for directory change "+strconv.Itoa(testOK)+": "+repo+" "+sub)
 		}
 		testOK += 1
+		return nil
 	}
-	informChangeDebounced := informChangeDebounce(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, fileChange)
+	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChangeDebounced(testDirectory+slash+testFiles[i])
+		informChange(testDirectory+slash+testFiles[i])
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if testOK != 3 {
@@ -155,7 +165,8 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 		"a"+slash+"b"+slash+"c"+slash+"file4" }
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 3
-	fileChange := func(repo string, sub string) {
+	testChannel := make(chan string, 10)
+	fileChange := func(repo string, sub string) error {
 		if testOK == 0 {
 			if repo != testRepo || sub != "a"+slash+"b" {
 				t.Error("Invalid result for directory change "+strconv.Itoa(testOK)+": "+repo+" "+sub)
@@ -167,10 +178,11 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 			}
 		}
 		testOK += 1
+		return nil
 	}
-	informChangeDebounced := informChangeDebounce(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, fileChange)
+	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChangeDebounced(testDirectory+slash+testFiles[i])
+		informChange(testDirectory+slash+testFiles[i])
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if testOK != 2 {
@@ -191,15 +203,17 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 		"file3" }
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 3
-	fileChange := func(repo string, sub string) {
+	testChannel := make(chan string, 10)
+	fileChange := func(repo string, sub string) error {
 		if repo != testRepo || sub != "" {
 			t.Error("Invalid result for directory change: "+repo)
 		}
 		testOK = true
+		return nil
 	}
-	informChangeDebounced := informChangeDebounce(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, fileChange)
+	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChangeDebounced(testDirectory+slash+testFiles[i])
+		informChange(testDirectory+slash+testFiles[i])
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if !testOK {
