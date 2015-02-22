@@ -18,7 +18,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/fsnotify"
+	"github.com/go-fsnotify/fsnotify"
 	"errors"
 	"os"
 	"path/filepath"
@@ -28,7 +28,7 @@ import (
 
 type SyncWatcher struct {
 	Error chan error
-	Event chan *fsnotify.FileEvent
+	Event chan fsnotify.Event
 
 	watcher   	*fsnotify.Watcher
 	paths     	map[string]string
@@ -47,7 +47,7 @@ func NewSyncWatcher(mainPath string, ignorePaths []string, ignorePatterns []Patt
 
 	sw := &SyncWatcher{
 		make(chan error),
-		make(chan *fsnotify.FileEvent),
+		make(chan fsnotify.Event),
 		watcher,
 		make(map[string]string),
 		mainPath,
@@ -57,17 +57,17 @@ func NewSyncWatcher(mainPath string, ignorePaths []string, ignorePatterns []Patt
 		&sync.Mutex{},
 	}
 
-	// Handle events from fsnotify,d eal with them,
+	// Handle events from fsnotify, deal with them
 	// and forward the interesting ones to the caller
 	go func() {
 		var (
-			ev  *fsnotify.FileEvent
+			ev  fsnotify.Event
 			err error
 		)
 		// Loop until both incoming channels are closed
 		for openEvent, openErr := true, true; openEvent || openErr; {
 			select {
-			case ev, openEvent = <-watcher.Event:
+			case ev, openEvent = <-watcher.Events:
 				if openEvent {
 					// Add or remove watches as appropriate
 					sw.pathMutex.Lock()
@@ -88,7 +88,7 @@ func NewSyncWatcher(mainPath string, ignorePaths []string, ignorePatterns []Patt
 					// Forward the event to our client.
 					sw.Event <- ev
 				}
-			case err, openErr = <-watcher.Error:
+			case err, openErr = <-watcher.Errors:
 				if openErr {
 					// Forward error events to our client
 					sw.Error <- err
@@ -135,7 +135,7 @@ func (w *SyncWatcher) removeWatch(path string) error {
 			}
 			if _, isroot := w.roots[dir]; !isroot {
 				delete(w.paths, dir)
-				return w.watcher.RemoveWatch(dir)
+				return w.watcher.Remove(dir)
 			}
 		}
 		return errors.New("cannot remove uknown watch: " + dir)
@@ -164,7 +164,7 @@ func (w *SyncWatcher) watch(path string) error {
 			if shouldIgnore(w.mainPath, w.ignorePaths, w.ignorePatterns, p) {
 				return err
 			}
-			err = w.watcher.Watch(p)
+			err = w.watcher.Add(p)
 			if err == nil {
 				w.paths[p] = ""
 				parent := filepath.Dir(p)

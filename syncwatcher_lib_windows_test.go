@@ -4,7 +4,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/fsnotify"
+	"github.com/go-fsnotify/fsnotify"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -62,16 +62,16 @@ func removeAll(t *testing.T, path string) {
 	return
 }
 
-func expectEvent(t *testing.T, sw *SyncWatcher) (ev *fsnotify.FileEvent, ok bool) {
+func expectEvent(t *testing.T, sw *SyncWatcher) (ev *fsnotify.Event, ok bool) {
 	timeout := time.After(time.Second * 2)
 	select {
-	case ev, ok = <-sw.Event:
+	case ev, ok = <-sw.Events:
 		if ok {
 			t.Log("Event:", ev)
 		} else {
 			t.Log("Event: channel closed")
 		}
-	case err, eok := <-sw.Error:
+	case err, eok := <-sw.Errors:
 		t.Error("Unexpected error from SyncWatcher channel:", err, eok)
 	case _ = <-timeout:
 		t.Error("no response")
@@ -81,16 +81,16 @@ func expectEvent(t *testing.T, sw *SyncWatcher) (ev *fsnotify.FileEvent, ok bool
 
 func expectClosed(t *testing.T, sw *SyncWatcher) {
 	timeout := time.After(time.Second * 2)
-	var ev *fsnotify.FileEvent
+	var ev fsnotify.Event
 	var err error
 Loop:
 	for ok, eok := true, true; ok || eok; {
 		select {
-		case ev, ok = <-sw.Event:
+		case ev, ok = <-sw.Events:
 			if ok {
 				t.Error("Unexpected event:", ev)
 			}
-		case err, eok = <-sw.Error:
+		case err, eok = <-sw.Errors:
 			if eok {
 				t.Error("Unexpected error from SyncWatcher channel:", err)
 			}

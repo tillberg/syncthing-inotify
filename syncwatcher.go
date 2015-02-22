@@ -2,7 +2,7 @@
 package main
 
 import (
-	"code.google.com/p/go.exp/fsnotify"
+	"github.com/go-fsnotify/fsnotify"
 	"github.com/cenkalti/backoff"
 	"os"
 	"bufio"
@@ -179,10 +179,6 @@ func watchFolder(folder FolderConfiguration) {
 	}
 	for {
 		ev := waitForEvent(sw)
-		if ev == nil {
-			log.Println("Error: fsnotify event is nil")
-			continue
-		}
 		if shouldIgnore(path, ignorePaths, ignorePatterns, ev.Name) {
 			continue
 		}
@@ -191,7 +187,7 @@ func watchFolder(folder FolderConfiguration) {
 	}
 }
 
-func waitForEvent(sw *SyncWatcher) (ev *fsnotify.FileEvent) {
+func waitForEvent(sw *SyncWatcher) (ev fsnotify.Event) {
 	var ok bool
 	select {
 		case ev, ok = <-sw.Event:
