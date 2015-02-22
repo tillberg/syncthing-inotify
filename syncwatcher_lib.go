@@ -60,14 +60,10 @@ func NewSyncWatcher(mainPath string, ignorePaths []string, ignorePatterns []Patt
 	// Handle events from fsnotify, deal with them
 	// and forward the interesting ones to the caller
 	go func() {
-		var (
-			ev  fsnotify.Event
-			err error
-		)
 		// Loop until both incoming channels are closed
 		for openEvent, openErr := true, true; openEvent || openErr; {
 			select {
-			case ev, openEvent = <-watcher.Events:
+			case ev, openEvent := <-watcher.Events:
 				if openEvent {
 					// Add or remove watches as appropriate
 					sw.pathMutex.Lock()
