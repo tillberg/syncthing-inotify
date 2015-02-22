@@ -28,7 +28,7 @@ func TestDebouncedFileWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	testChannel <- testDirectory+slash+testFile
 	time.Sleep(testDebounceTimeout*10)
 	if !testOK {
@@ -53,8 +53,8 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
-	informChange(testDirectory+slash+testFile)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	testChannel <- testDirectory+slash+testFile
 	time.Sleep(testDebounceTimeout*2)
 	if !testOK {
 		t.Error("Callback not triggered")
@@ -78,9 +78,9 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChange(testDirectory+slash+testFiles[i])
+		testChannel <- testDirectory+slash+testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if !testOK {
@@ -112,9 +112,9 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 		testOK += 1
 		return nil
 	}
-	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChange(testDirectory+slash+testFiles[i])
+		testChannel <- testDirectory+slash+testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if testOK != 2 {
@@ -141,9 +141,9 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		testOK += 1
 		return nil
 	}
-	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChange(testDirectory+slash+testFiles[i])
+		testChannel <- testDirectory+slash+testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if testOK != 3 {
@@ -180,9 +180,9 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 		testOK += 1
 		return nil
 	}
-	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChange(testDirectory+slash+testFiles[i])
+		testChannel <- testDirectory+slash+testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if testOK != 2 {
@@ -211,9 +211,9 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	informChange := informChangeAccumulator(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, testChannel, fileChange)
 	for i := range testFiles {
-		informChange(testDirectory+slash+testFiles[i])
+		testChannel <- testDirectory+slash+testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout*2)
 	if !testOK {

@@ -172,7 +172,7 @@ func watchFolder(folder FolderConfiguration) {
 		return
 	}
 	informChannel := make(chan string, 10)
-	go informChangeAccumulator(debounceTimeout, folder.ID, path, dirVsFiles, informChannel, informChange)
+	go accumulateChanges(debounceTimeout, folder.ID, path, dirVsFiles, informChannel, informChange)
 	log.Println("Watching " + folder.ID + ": " + path)
 	if folder.RescanIntervalS < 1800 {
 		log.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
@@ -194,6 +194,7 @@ func waitForEvent(sw *SyncWatcher) (ev fsnotify.Event) {
 			if !ok {
 				log.Println("Error: channel closed")
 			}
+			return ev
 		case err, eok := <-sw.Error:
 			log.Println(err, eok)
 	}
@@ -201,6 +202,7 @@ func waitForEvent(sw *SyncWatcher) (ev fsnotify.Event) {
 }
 
 func shouldIgnore(folderPath string, ignorePaths []string, ignorePatterns []Pattern, path string) bool {
+	if (path == "") { return true }
 	relP := strings.TrimPrefix(path, folderPath)
 	for _, ignorePath := range ignorePaths {
 		if strings.Contains(relP, ignorePath) {
@@ -289,89 +291,86 @@ func informChange(folder string, sub string) error {
 	return err
 }
 
-func informChangeAccumulator(interval time.Duration, folder string, folderPath string, dirVsFiles int, input chan string,
-			callback func(folder string, sub string) error) func(string) {
-	debounce := func(f func(paths []string) error) func(string) {
-		subs := make([]string, 0)
-		var item = <-input
-		for {
-			select {
-				case item = <-input:
-					if len(subs) < maxFiles {
-						subs = append(subs, item)
+func accumulateChanges(interval time.Duration, folder string, folderPath string, dirVsFiles int,
+			input chan string, callback func(folder string, sub string) error) func(string) {
+	subs := make([]string, 0)
+	for {
+		select {
+			case item := <-input:
+				if len(subs) < maxFiles {
+					subs = append(subs, item)
+				}
+			case <-time.After(interval):
+				if len(subs) < maxFiles {
+					// Try to inform changes to syncthing and if succeeded, clean up
+					err := aggregateChanges(folder, folderPath, dirVsFiles, callback, subs)
+					if err == nil {
+						subs = make([]string, 0)
 					}
-				case <-time.After(interval):
-					if len(subs) < maxFiles {
-						err := f(subs)
-						if err == nil { // I don't know how to declare err outside the if (a nil value is not allowed)
-							subs = make([]string, 0)
-						}
-					} else {
-						err := f([]string{ folderPath })
-						if err == nil {
-							subs = make([]string, 0)
-						}
+				} else {
+					// Do not track more than maxFiles changes, inform syncthing to rescan entire folder
+					err := aggregateChanges(folder, folderPath, dirVsFiles, callback, []string{ folderPath })
+					if err == nil {
+						subs = make([]string, 0)
 					}
-			}
+				}
 		}
 	}
+}
 	
-	return debounce(func(paths []string) error {
-		// Do not inform Syncthing immediately but wait for debounce
-		// Therefore, we need to keep track of the paths that were changed
-		// This function optimises tracking in two ways:
-		//	- If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
-		//	- Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
-		if (len(paths) == 0) { return errors.New("No folders to watch") }
-		trackedPaths := make(map[string]int) // Map directories to scores; if score == -1 the path is a filename
-		sort.Strings(paths) // Make sure parent paths are processed first
-		previousPath := "" // Filter duplicates
-		for i := range paths {
-			path := paths[i]
-			if (path == previousPath) {
-				continue
-			}
-			previousPath = path
-			dir := filepath.Dir(path)
-			score := 1 // File change counts for 1 per directory
-			if dir == filepath.Clean(path) {
-				score = dirVsFiles // Is directory itself, should definitely inform
-			}
-			// Search for existing parent directory relations in the map
-			for trackedPath, _ := range trackedPaths {
-				if strings.HasPrefix(dir, trackedPath) {
-					// Increment score of tracked current/parent directory
-					trackedPaths[trackedPath] += score
-				}
-			}
-			_, exists := trackedPaths[dir]
-			if !exists {
-				trackedPaths[dir] = score
-			}
-			trackedPaths[path] = -1
+func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback func(folder string, folderPath string) error, paths []string) error {
+	// This function optimises tracking in two ways:
+	//	- If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
+	//	- Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
+	if (len(paths) == 0) { return errors.New("No folders to watch") }
+	trackedPaths := make(map[string]int) // Map directories to scores; if score == -1 the path is a filename
+	sort.Strings(paths) // Make sure parent paths are processed first
+	previousPath := "" // Filter duplicates
+	for i := range paths {
+		path := paths[i]
+		if (path == previousPath) {
+			continue
 		}
-		var keys []string
-		for k := range trackedPaths {
-			keys = append(keys, k)
+		previousPath = path
+		dir := filepath.Dir(path)
+		score := 1 // File change counts for 1 per directory
+		if dir == filepath.Clean(path) {
+			score = dirVsFiles // Is directory itself, should definitely inform
 		}
-		sort.Strings(keys) // Sort directories before their own files
-		previousDone, previousPath := false, ""
-		for i := range keys {
-			trackedPath := keys[i]
-			trackedPathScore, _ := trackedPaths[trackedPath]
-			if previousDone && strings.HasPrefix(trackedPath, previousPath) { continue } // Already informed parent directory change
-			if trackedPathScore < dirVsFiles && trackedPathScore != -1 { continue } // Not enough files for this directory or it is a file
-			previousDone = trackedPathScore != -1
-			previousPath = trackedPath
-			sub := strings.TrimPrefix(trackedPath, folderPath)
-			sub = strings.TrimPrefix(sub, string(os.PathSeparator))
-			err := callback(folder, sub)
-			if err != nil {
-				return err
+		// Search for existing parent directory relations in the map
+		for trackedPath, _ := range trackedPaths {
+			if strings.HasPrefix(dir, trackedPath) {
+				// Increment score of tracked current/parent directory
+				trackedPaths[trackedPath] += score
 			}
 		}
-		return nil
-	})
+		_, exists := trackedPaths[dir]
+		if !exists {
+			trackedPaths[dir] = score
+		}
+		trackedPaths[path] = -1
+	}
+	var keys []string
+	for k := range trackedPaths {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys) // Sort directories before their own files
+	previousDone, previousPath := false, ""
+	for i := range keys {
+		trackedPath := keys[i]
+		trackedPathScore, _ := trackedPaths[trackedPath]
+		if previousDone && strings.HasPrefix(trackedPath, previousPath) { continue } // Already informed parent directory change
+		if trackedPathScore < dirVsFiles && trackedPathScore != -1 { continue } // Not enough files for this directory or it is a file
+		previousDone = trackedPathScore != -1
+		previousPath = trackedPath
+		sub := strings.TrimPrefix(trackedPath, folderPath)
+		sub = strings.TrimPrefix(sub, string(os.PathSeparator))
+		err := callback(folder, sub)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func getHomeDir() string {
