@@ -2,7 +2,6 @@
 package main
 
 import (
-	"github.com/go-fsnotify/fsnotify"
 	"github.com/cenkalti/backoff"
 	"os"
 	"bufio"
@@ -179,26 +178,25 @@ func watchFolder(folder FolderConfiguration) {
 	}
 	for {
 		ev := waitForEvent(sw)
-		if shouldIgnore(path, ignorePaths, ignorePatterns, ev.Name) {
+		if shouldIgnore(path, ignorePaths, ignorePatterns, ev) {
 			continue
 		}
-		log.Println("Change detected in " + ev.Name)
-		informChannel <- ev.Name
+		log.Println("Change detected in " + ev)
+		informChannel <- ev
 	}
 }
 
-func waitForEvent(sw *SyncWatcher) (ev fsnotify.Event) {
-	var ok bool
+func waitForEvent(sw *SyncWatcher) string {
 	select {
-		case ev, ok = <-sw.Event:
+		case ev, ok := <-sw.Event:
 			if !ok {
 				log.Println("Error: channel closed")
 			}
-			return ev
+			return ev.Name
 		case err, eok := <-sw.Error:
 			log.Println(err, eok)
 	}
-	return
+	return ""
 }
 
 func shouldIgnore(folderPath string, ignorePaths []string, ignorePatterns []Pattern, path string) bool {
