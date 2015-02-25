@@ -3,6 +3,7 @@ package main
 
 import (
 	"github.com/cenkalti/backoff"
+	"github.com/calmh/logger"
 	"os"
 	"bufio"
 	"io/ioutil"
@@ -66,6 +67,7 @@ var (
 var (
 	stop = make(chan int)
 	ignorePaths = []string{".stversions", ".stfolder", ".stignore", ".syncthing", "~syncthing~"}
+	l = logger.DefaultLogger
 )
 
 func init() {
@@ -102,7 +104,7 @@ func main() {
 	}
 
 	code := <-stop
-	println("Exiting")
+	l.Infoln("Exiting")
 	os.Exit(code)
 
 }
@@ -200,26 +202,31 @@ func waitForEvent(sw *SyncWatcher) string {
 }
 
 func shouldIgnore(folderPath string, ignorePaths []string, ignorePatterns []Pattern, path string) bool {
-	if (path == "") { return true }
-	relP := strings.TrimPrefix(path, folderPath)
+	if len(path) == 0 { return true }
+	path = strings.TrimPrefix(path, folderPath)
+	if len(path) == 0 { return false }
+	if os.IsPathSeparator(path[0]) {
+		path = path[1 : len(path)]
+	}
+	if len(path) == 0 { return false }
 	for _, ignorePath := range ignorePaths {
-		if strings.Contains(relP, ignorePath) {
+		if strings.Contains(path, ignorePath) {
 			return true
 		}
 	}
 	for _, p1 := range ignorePatterns {
-		//println("Testing", relP, "to", p1.match.String())
-		if p1.include && p1.match.MatchString(relP) {
+		//l.Debugln("Testing", path, "to", p1.match.String())
+		if p1.include && p1.match.MatchString(path) {
 			keep := false
 			for _, p2 := range ignorePatterns {
-				if !p2.include && p2.match.MatchString(relP) {
-					//println("Keeping", relP, "because", p2.match.String())
+				if !p2.include && p2.match.MatchString(path) {
+					//l.Debugln("Keeping", path, "because", p2.match.String())
 					keep = true
 					break
 				}
 			}
 			if !keep {
-				//println("Ignoring", relP)
+				//l.Debugln("Ignoring", path)
 				return true
 			}
 		}
