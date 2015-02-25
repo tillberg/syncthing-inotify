@@ -3,10 +3,10 @@
 # `/bin/bash -ic 'cd $(dirname $(dirname $(which go)))/src && ./make.bash'`
 
 oses = [
-  "linux-386", "linux-amd64", "linux-arm-v5", "linux-arm-v7",
+  "linux-386", "linux-amd64", "linux-arm",
   "darwin-386", "darwin-amd64",
   "openbsd-386", "openbsd-amd64",
-  "freebsd-386", "freebsd-amd64", "freebsd-arm-v5", "freebsd-arm-v7",
+  "freebsd-386", "freebsd-amd64", "freebsd-arm",
   "windows-386", "windows-amd64"]
 
 version = `git describe --abbrev=0 --tags`.chomp
@@ -18,9 +18,6 @@ oses.each do |os|
   newname = "syncthing-inotify-#{os}"
   buildX = ""
   cross = os.gsub(/-v\d/,"")
-  if os.include?("arm")
-    buildX = "GOARM=#{os[-1]}"
-  end
   if os.include?("windows")
     name = name + ".exe"
   end
