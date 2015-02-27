@@ -18,8 +18,8 @@
 package main
 
 import (
-	"github.com/go-fsnotify/fsnotify"
 	"errors"
+	"github.com/go-fsnotify/fsnotify"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,13 +30,13 @@ type SyncWatcher struct {
 	Error chan error
 	Event chan fsnotify.Event
 
-	watcher   	*fsnotify.Watcher
-	paths     	map[string]string
-	mainPath	string
-	ignorePaths 	[]string
-	ignorePatterns 	[]Pattern
-	roots     	map[string]int
-	pathMutex 	*sync.Mutex
+	watcher        *fsnotify.Watcher
+	paths          map[string]string
+	mainPath       string
+	ignorePaths    []string
+	ignorePatterns []Pattern
+	roots          map[string]int
+	pathMutex      *sync.Mutex
 }
 
 func NewSyncWatcher(mainPath string, ignorePaths []string, ignorePatterns []Pattern) (*SyncWatcher, error) {
@@ -157,7 +157,8 @@ func (w *SyncWatcher) watch(path string) error {
 
 	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
-			if shouldIgnore(w.mainPath, w.ignorePaths, w.ignorePatterns, p) {
+			if shouldIgnore(w.ignorePaths, w.ignorePatterns, relativePath(p, w.mainPath)) {
+				//println("Ignoring: " + p)
 				return err
 			}
 			err = w.watcher.Add(p)

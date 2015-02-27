@@ -3,13 +3,13 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
-	"os"
-	"strconv"
-	"encoding/json"
-	"strings"
-	"regexp"
 )
 
 func TestIgnores(t *testing.T) {
@@ -27,14 +27,12 @@ func TestIgnores(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ignorePatterns[i] = Pattern { regexp, str == pattern }
+		ignorePatterns[i] = Pattern{regexp, str == pattern}
 	}
-	if !shouldIgnore("C:\\test", ignorePaths, ignorePatterns, "C:\\test\\.DS_Store") {
+	if !shouldIgnore(ignorePaths, ignorePatterns, ".DS_Store") {
 		t.Error("Should ignore this pattern")
 	}
-	if !shouldIgnore("C:\\test", ignorePaths, ignorePatterns, "C:\\test\\ignored folder") {
+	if !shouldIgnore(ignorePaths, ignorePatterns, "ignored folder") {
 		t.Error("Should ignore this pattern")
 	}
 }
-
-

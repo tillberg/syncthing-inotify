@@ -4,10 +4,10 @@
 package main
 
 import (
-	"testing"
 	"encoding/json"
-	"strings"
 	"regexp"
+	"strings"
+	"testing"
 )
 
 func TestIgnores(t *testing.T) {
@@ -25,11 +25,9 @@ func TestIgnores(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ignorePatterns[i] = Pattern { regexp, str == pattern }
+		ignorePatterns[i] = Pattern{regexp, str == pattern}
 	}
-	if !shouldIgnore("/home/user/Downloads", ignorePaths, ignorePatterns, "/home/user/Downloads/ignored file.iso") {
+	if !shouldIgnore(ignorePaths, ignorePatterns, "ignored file.iso") {
 		t.Error("Should ignore this pattern")
 	}
 }
-
-

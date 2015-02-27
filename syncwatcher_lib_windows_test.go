@@ -4,8 +4,8 @@
 package main
 
 import (
-	"github.com/go-fsnotify/fsnotify"
 	"fmt"
+	"github.com/go-fsnotify/fsnotify"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -117,18 +117,18 @@ func TestWatchFiles(t *testing.T) {
 	createEmptyFile(t, file1)
 	ev, ok := expectEvent(t, sw)
 	if !ok || !ev.IsCreate() || ev.Name != file1 {
-		t.Error("Expected file create event, got: "+ev.String())
+		t.Error("Expected file create event, got: " + ev.String())
 	}
 
 	// Test: File rename
 	os.Rename(file1, file2)
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsRename() || ev.Name != file1 {
-		t.Error("Expected file rename event, got: "+ev.String())
+		t.Error("Expected file rename event, got: " + ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsRename() || ev.Name != file2 {
-		t.Error("Expected file rename event, got: "+ev.String())
+		t.Error("Expected file rename event, got: " + ev.String())
 	}
 
 	// Test: File modification
@@ -140,14 +140,14 @@ func TestWatchFiles(t *testing.T) {
 	fd.Close()
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsModify() || ev.Name != file2 {
-		t.Error("Expected file modify event, got: "+ev.String())
+		t.Error("Expected file modify event, got: " + ev.String())
 	}
 
 	// Test: File deletion
 	os.Remove(file2)
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsDelete() || ev.Name != file2 {
-		t.Error("Expected file delete event, got: "+ev.String())
+		t.Error("Expected file delete event, got: " + ev.String())
 	}
 
 	sw.Close()
@@ -179,7 +179,7 @@ func TestRecursiveWatch(t *testing.T) {
 	mkdir(t, dir1)
 	ev, ok := expectEvent(t, sw)
 	if !ok || !ev.IsCreate() || ev.Name != dir1 {
-		t.Error("Expected directory create event, got: "+ev.String())
+		t.Error("Expected directory create event, got: " + ev.String())
 	}
 
 	// Test: check internal state
@@ -195,22 +195,22 @@ func TestRecursiveWatch(t *testing.T) {
 	createEmptyFile(t, file1)
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsCreate() || ev.Name != file1 {
-		t.Error("Expected file create event, got: "+ev.String())
+		t.Error("Expected file create event, got: " + ev.String())
 	}
 
 	// Test: Directory rename
 	os.Rename(dir1, dir2)
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsRename() || ev.Name != dir1 {
-		t.Error("Expected directory rename event, got: "+ev.String())
+		t.Error("Expected directory rename event, got: " + ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsRename() || ev.Name != dir2 {
-		t.Error("Expected directory rename event for "+dir2+", got: "+ev.String())
+		t.Error("Expected directory rename event for " + dir2 + ", got: " + ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
 	if !ok {
-		t.Error("Failed to process event, got: "+ev.String())
+		t.Error("Failed to process event, got: " + ev.String())
 	}
 
 	// Test: check internal state
@@ -226,26 +226,26 @@ func TestRecursiveWatch(t *testing.T) {
 	createEmptyFile(t, file2)
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsCreate() || ev.Name != file2 {
-		t.Error("Expected file create event, got: "+ev.String())
+		t.Error("Expected file create event, got: " + ev.String())
 	}
 
 	// Test: Directory deletion
 	removeAll(t, dir2)
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsDelete() || (ev.Name != file1 && ev.Name != file2) {
-		t.Error("Expected file delete event, got: "+ev.String())
+		t.Error("Expected file delete event, got: " + ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsDelete() || (ev.Name != file1 && ev.Name != file2) {
-		t.Error("Expected directory delete event, got: "+ev.String())
+		t.Error("Expected directory delete event, got: " + ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsDelete() || ev.Name != dir2 {
-		t.Error("Expected directory delete event, got: "+ev.String())
+		t.Error("Expected directory delete event, got: " + ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsDelete() || ev.Name != dir2 {
-		t.Error("Expected directory delete event, got: "+ev.String())
+		t.Error("Expected directory delete event, got: " + ev.String())
 	}
 
 	// Test: check internal state
@@ -297,11 +297,11 @@ func TestMoveIn(t *testing.T) {
 	os.Rename(createdir, moveddir)
 	ev, ok := expectEvent(t, sw)
 	if !ok || !ev.IsCreate() || ev.Name != moveddir {
-		t.Error("Expected directory create event, got: "+ev.String())
+		t.Error("Expected directory create event, got: " + ev.String())
 	}
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsModify() || ev.Name != moveddir {
-		t.Error("Expected directory modify event, got: "+ev.String())
+		t.Error("Expected directory modify event, got: " + ev.String())
 	}
 
 	// Test: check internal state
@@ -340,7 +340,7 @@ func TestMoveOut(t *testing.T) {
 	mkdir(t, filepath.Join(createdir, "subdir"))
 	ev, ok := expectEvent(t, sw)
 	if !ok || !ev.IsCreate() || ev.Name != createdir {
-		t.Error("Expected directory create event, got: "+ev.String())
+		t.Error("Expected directory create event, got: " + ev.String())
 	}
 
 	// Test: check internal state
@@ -353,7 +353,7 @@ func TestMoveOut(t *testing.T) {
 	os.Rename(createdir, moveddir)
 	ev, ok = expectEvent(t, sw)
 	if !ok || !ev.IsModify() || ev.Name != createdir {
-		t.Error("Expected directory modify event, got: "+ev.String())
+		t.Error("Expected directory modify event, got: " + ev.String())
 	}
 
 	// Test: check internal state
