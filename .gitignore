@@ -1,6 +1,2 @@
 *~
-bin
-pkg
-src/syncthing-inotify/syncthing-inotify
-src/code.google.com/
-src/github.com/
+syncthing-inotify*
