@@ -136,7 +136,7 @@ func main() {
 		log.Fatalln("No folders found") // TODO update on ConfigSaved event
 	}
 	stChans := newSTChans(folders)
-	go watchSTEvents(stChans)
+	go watchSTEvents(stChans, folders)
 	for i := range folders {
 		go watchFolder(folders[i], stChans[folders[i].ID])
 	}
@@ -498,7 +498,7 @@ func newSTChans(folders []FolderConfiguration) map[string]chan STEvent {
 }
 
 // TODO: singleton pattern based on inotify events: "If no new events are produced since <lastSeenID>, the HTTP call blocks and waits for new events to happen before returning, or if no new events are produced within 60 seconds, times out."
-func watchSTEvents(stChans map[string]chan STEvent) {
+func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguration) {
 	lastSeenID := 0
 	for {
 		events, _ := getSTEvents(lastSeenID)
@@ -528,6 +528,21 @@ func watchSTEvents(stChans map[string]chan STEvent) {
 					continue
 				}
 				ch <- STEvent{Path: data["item"].(string), Finished: true}
+			case "ConfigSaved":
+				newFolders := getFolders()
+				Trace.Println("ConfigSaved, checking for new folders")
+				for _, newF := range newFolders {
+					seen := false
+					for _, f := range folders {
+						if f.ID == newF.ID && f.Path == newF.Path {
+							seen = true
+						}
+					}
+					if !seen {
+						Error.Println("New folder added, exiting")
+						os.Exit(1)
+					}
+				}
 			}
 		}
 		lastSeenID = events[len(events)-1].ID
