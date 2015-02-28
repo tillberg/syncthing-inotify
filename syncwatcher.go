@@ -71,6 +71,7 @@ var (
 var (
 	debounceTimeout    = 300 * time.Millisecond
 	remoteIndexTimeout = 600 * time.Millisecond
+	configSyncTimeout  = 5 * time.Second
 	dirVsFiles         = 100
 	maxFiles           = 5000
 )
@@ -80,16 +81,15 @@ var (
 	stop        = make(chan int)
 	ignorePaths = []string{".stversions", ".stfolder", ".stignore", ".syncthing"}
 	Discard     = log.New(ioutil.Discard, "", log.Ldate)
-	Error       = Discard // 1
-	Warning     = Discard
+	Warning     = Discard // 1
 	OK          = Discard
 	Trace       = Discard
-	Debug       = Discard // 5
+	Debug       = Discard // 4
 )
 
 func init() {
 	var verbosity int
-	flag.IntVar(&verbosity, "verbosity", 3, "Logging level [1..5]")
+	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
 	flag.StringVar(&target, "target", "localhost:8080", "Target")
 	flag.StringVar(&authUser, "user", "", "Username")
 	flag.StringVar(&authPass, "pass", "", "Password")
@@ -97,18 +97,15 @@ func init() {
 	flag.StringVar(&apiKey, "api", "", "API key")
 	flag.Parse()
 	if verbosity >= 1 {
-		Error = log.New(os.Stderr, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
-	}
-	if verbosity >= 2 {
 		Warning = log.New(os.Stdout, "[WARNING] ", log.Ldate|log.Ltime|log.Lshortfile)
 	}
-	if verbosity >= 3 {
+	if verbosity >= 2 {
 		OK = log.New(os.Stdout, "[OK] ", log.Ldate|log.Ltime|log.Lshortfile)
 	}
-	if verbosity >= 4 {
+	if verbosity >= 3 {
 		Trace = log.New(os.Stdout, "[TRACE] ", log.Ldate|log.Ltime|log.Lshortfile)
 	}
-	if verbosity >= 5 {
+	if verbosity >= 4 {
 		Debug = log.New(os.Stdout, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
 	}
 	if !strings.Contains(target, "://") {
@@ -133,13 +130,15 @@ func main() {
 
 	folders := getFolders()
 	if len(folders) == 0 {
-		log.Fatalln("No folders found") // TODO update on ConfigSaved event
+		log.Fatalln("No folders found")
 	}
-	stChans := newSTChans(folders)
-	go watchSTEvents(stChans, folders)
-	for i := range folders {
-		go watchFolder(folders[i], stChans[folders[i].ID])
+	stChans := make(map[string]chan STEvent, len(folders))
+	for _, folder := range folders {
+		stChan := make(chan STEvent)
+		stChans[folder.ID] = stChan
+		go watchFolder(folder, stChan)
 	}
+	go watchSTEvents(stChans, folders) // Note: Lose thread ownership of stChans
 
 	code := <-stop
 	OK.Println("Exiting")
@@ -148,38 +147,47 @@ func main() {
 }
 
 func getIgnorePatterns(folder string) []Pattern {
-	r, err := http.NewRequest("GET", target+"/rest/ignores?folder="+folder, nil)
-	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
+	for {
+		r, err := http.NewRequest("GET", target+"/rest/ignores?folder="+folder, nil)
+		res, err := performRequest(r)
+		defer func() {
+			if res != nil && res.Body != nil {
+				res.Body.Close()
+			}
+		}()
+		if err != nil {
+			Warning.Println("Failed to perform request /rest/ignores: ", err)
+			time.Sleep(configSyncTimeout)
+			continue
 		}
-	}()
-	if err != nil {
-		log.Fatalln("Failed to perform request", err)
-	}
-	if res.StatusCode != 200 {
-		log.Fatalf("Status %d != 200 for GET", res.StatusCode)
-	}
-	bs, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	var ignores map[string][]string
-	err = json.Unmarshal(bs, &ignores)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	patterns := make([]Pattern, len(ignores["patterns"]))
-	for i, str := range ignores["patterns"] {
-		pattern := strings.TrimPrefix(str, "(?exclude)")
-		regexp, err := regexp.Compile(pattern)
+		if res.StatusCode == 500 {
+			Warning.Println("Syncthing not ready in " + folder + " for /rest/ignores")
+			time.Sleep(configSyncTimeout)
+			continue
+		}
+		if res.StatusCode != 200 {
+			log.Fatalf("Status %d != 200 for GET /rest/ignores: ", res.StatusCode, res)
+		}
+		bs, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		patterns[i] = Pattern{regexp, str == pattern}
+		var ignores map[string][]string
+		err = json.Unmarshal(bs, &ignores)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		patterns := make([]Pattern, len(ignores["patterns"]))
+		for i, str := range ignores["patterns"] {
+			pattern := strings.TrimPrefix(str, "(?exclude)")
+			regexp, err := regexp.Compile(pattern)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			patterns[i] = Pattern{regexp, str == pattern}
+		}
+		return patterns
 	}
-	return patterns
 }
 
 func getFolders() []FolderConfiguration {
@@ -191,10 +199,10 @@ func getFolders() []FolderConfiguration {
 		}
 	}()
 	if err != nil {
-		log.Fatalln("Failed to perform request", err)
+		log.Fatalln("Failed to perform request /rest/config: ", err)
 	}
 	if res.StatusCode != 200 {
-		log.Fatalf("Status %d != 200 for GET", res.StatusCode)
+		log.Fatalf("Status %d != 200 for GET /rest/config: ", res.StatusCode)
 	}
 	bs, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -489,15 +497,6 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	return nil
 }
 
-func newSTChans(folders []FolderConfiguration) map[string]chan STEvent {
-	chans := make(map[string]chan STEvent)
-	for _, folder := range folders {
-		chans[folder.ID] = make(chan STEvent)
-	}
-	return chans
-}
-
-// TODO: singleton pattern based on inotify events: "If no new events are produced since <lastSeenID>, the HTTP call blocks and waits for new events to happen before returning, or if no new events are produced within 60 seconds, times out."
 func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguration) {
 	lastSeenID := 0
 	for {
@@ -529,20 +528,8 @@ func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguratio
 				}
 				ch <- STEvent{Path: data["item"].(string), Finished: true}
 			case "ConfigSaved":
-				newFolders := getFolders()
-				Trace.Println("ConfigSaved, checking for new folders")
-				for _, newF := range newFolders {
-					seen := false
-					for _, f := range folders {
-						if f.ID == newF.ID && f.Path == newF.Path {
-							seen = true
-						}
-					}
-					if !seen {
-						Error.Println("New folder added, exiting")
-						os.Exit(1)
-					}
-				}
+				Trace.Println("ConfigSaved, exiting if folders changed")
+				go waitForSyncAndExitIfNeeded(folders)
 			}
 		}
 		lastSeenID = events[len(events)-1].ID
@@ -572,6 +559,64 @@ func getSTEvents(lastSeenID int) ([]Event, error) {
 	var events []Event
 	err = json.Unmarshal(bs, &events)
 	return events, err
+}
+
+func waitForSyncAndExitIfNeeded(folders []FolderConfiguration) {
+	waitForSync()
+	newFolders := getFolders()
+	same := len(folders) == len(newFolders)
+	for _, newF := range newFolders {
+		seen := false
+		for _, f := range folders {
+			if f.ID == newF.ID && f.Path == newF.Path {
+				seen = true
+			}
+		}
+		if !seen {
+			Warning.Println("Folder " + newF.ID + " changed")
+			same = false
+		}
+	}
+	if !same {
+		// Simply exit as folders:
+		// - can be added (still ok)
+		// - can be removed as well (requires informing tons of goroutines...)
+		log.Fatalln("Syncthing folder configuration updated, exiting...")
+		os.Exit(1)
+	}
+}
+
+func waitForSync() {
+	for {
+		r, err := http.NewRequest("GET", target+"/rest/config/sync", nil)
+		res, err := performRequest(r)
+		defer func() {
+			if res != nil && res.Body != nil {
+				res.Body.Close()
+			}
+		}()
+		if err != nil {
+			Warning.Println("Failed to perform request /rest/config/sync", err)
+			time.Sleep(configSyncTimeout)
+			continue
+		}
+		if res.StatusCode != 200 {
+			Warning.Printf("Status %d != 200 for GET", res.StatusCode)
+			time.Sleep(configSyncTimeout)
+			continue
+		}
+		bs, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			time.Sleep(configSyncTimeout)
+			continue
+		}
+		var inSync map[string]bool
+		err = json.Unmarshal(bs, &inSync)
+		if inSync["configInSync"] {
+			return
+		}
+		time.Sleep(configSyncTimeout)
+	}
 }
 
 func getHomeDir() string {
