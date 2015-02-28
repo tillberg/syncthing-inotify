@@ -1,19 +1,33 @@
-#### Building
-1. Build syncthing-inotify
+#### What is this?
+Syncthing ([core](https://github.com/syncthing/syncthing)) uses a rescan interval to detect changes in folders. This application (syncthing-inotify) uses OS primitives to detect changes as soon as they happen. Therefore, if you save a file, syncthing-inotify will know about it and pass this information to Syncthing such that near real-time synchronisation can be achieved.
+
+#### Where do I get it?
+Syncthing-inotify binaries are released on [github](https://github.com/syncthing/syncthing-inotify/releases)
+
+#### How do I run it?
+  * Run and hide on unix using API key in a screen
+```
+screen -S inotify -dm ./syncthing-inotify -api="..."
+```
+  * Run and hide on windows using API key in .vbs script
+```
+CreateObject("Wscript.Shell").Run "syncthing-inotify.exe -api=""...""", 0, True
+```
+
+#### I'm confused
+  * Try [Syncthing-GTK](https://github.com/syncthing/syncthing-gtk)
+  * Read the commandline options: ```./syncthing-inotify -help```
+
+#### Building syncthing-inotify
 ```
 # To clone
 mkdir -p src/github.com/syncthing
 git clone https://github.com/syncthing/syncthing-inotify.git src/github.com/syncthing/syncthing-inotify
-# Following commands are needed every time you want to build (unless you use Golang's specific folder structure: C:\src or ~/src/)
+# Following commands are needed every time you want to build (unless you use Golang's specific folder structure: C:\src  or ~/src/)
 export GOPATH=$(pwd)
 cd src/github.com/syncthing/syncthing-inotify
 go get
 go build
-```
-
-2. Run using API key
-```
-./inotify -api="..."
 ```
 
 
