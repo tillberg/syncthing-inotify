@@ -8,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/calmh/logger"
 	"github.com/cenkalti/backoff"
 	"io/ioutil"
 	"log"
@@ -79,24 +78,46 @@ var (
 // Main
 var (
 	stop        = make(chan int)
-	ignorePaths = []string{".stversions", ".stfolder", ".stignore", ".syncthing", "~syncthing~"}
-	l           = logger.DefaultLogger
+	ignorePaths = []string{".stversions", ".stfolder", ".stignore", ".syncthing"}
+	Discard     = log.New(ioutil.Discard, "", log.Ldate)
+	Error       = Discard // 1
+	Warning     = Discard
+	OK          = Discard
+	Trace       = Discard
+	Debug       = Discard // 5
 )
 
 func init() {
+	var verbosity int
+	flag.IntVar(&verbosity, "verbosity", 3, "Logging level [1..5]")
 	flag.StringVar(&target, "target", "localhost:8080", "Target")
 	flag.StringVar(&authUser, "user", "", "Username")
 	flag.StringVar(&authPass, "pass", "", "Password")
 	flag.StringVar(&csrfFile, "csrf", "", "CSRF token file")
 	flag.StringVar(&apiKey, "api", "", "API key")
 	flag.Parse()
+	if verbosity >= 1 {
+		Error = log.New(os.Stderr, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
+	if verbosity >= 2 {
+		Warning = log.New(os.Stdout, "[WARNING] ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
+	if verbosity >= 3 {
+		OK = log.New(os.Stdout, "[OK] ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
+	if verbosity >= 4 {
+		Trace = log.New(os.Stdout, "[TRACE] ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
+	if verbosity >= 5 {
+		Debug = log.New(os.Stdout, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
 	if !strings.Contains(target, "://") {
 		target = "http://" + target
 	}
 	if len(csrfFile) > 0 {
 		fd, err := os.Open(csrfFile)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalln(err)
 		}
 		s := bufio.NewScanner(fd)
 		for s.Scan() {
@@ -112,7 +133,7 @@ func main() {
 
 	folders := getFolders()
 	if len(folders) == 0 {
-		log.Fatal("No folders found") // TODO update on ConfigSaved event
+		log.Fatalln("No folders found") // TODO update on ConfigSaved event
 	}
 	stChans := newSTChans(folders)
 	go watchSTEvents(stChans)
@@ -121,7 +142,7 @@ func main() {
 	}
 
 	code := <-stop
-	l.Infoln("Exiting")
+	OK.Println("Exiting")
 	os.Exit(code)
 
 }
@@ -134,24 +155,27 @@ func getIgnorePatterns(folder string) []Pattern {
 			res.Body.Close()
 		}
 	}()
+	if err != nil {
+		log.Fatalln("Failed to perform request", err)
+	}
 	if res.StatusCode != 200 {
 		log.Fatalf("Status %d != 200 for GET", res.StatusCode)
 	}
 	bs, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	var ignores map[string][]string
 	err = json.Unmarshal(bs, &ignores)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	patterns := make([]Pattern, len(ignores["patterns"]))
 	for i, str := range ignores["patterns"] {
 		pattern := strings.TrimPrefix(str, "(?exclude)")
 		regexp, err := regexp.Compile(pattern)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalln(err)
 		}
 		patterns[i] = Pattern{regexp, str == pattern}
 	}
@@ -166,17 +190,20 @@ func getFolders() []FolderConfiguration {
 			res.Body.Close()
 		}
 	}()
+	if err != nil {
+		log.Fatalln("Failed to perform request", err)
+	}
 	if res.StatusCode != 200 {
 		log.Fatalf("Status %d != 200 for GET", res.StatusCode)
 	}
 	bs, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	var cfg Configuration
 	err = json.Unmarshal(bs, &cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	return cfg.Folders
 }
@@ -187,27 +214,27 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	fsInput := make(chan string)
 	sw, err := NewSyncWatcher(folderPath, ignorePaths, ignorePatterns)
 	if sw == nil || err != nil {
-		log.Println(err)
+		Warning.Println(err)
 		return
 	}
 	defer sw.Close()
 	err = sw.Watch(folderPath)
 	if err != nil {
-		log.Println(err)
+		Warning.Println(err)
 		return
 	}
-	log.Println("Watching " + folder.ID + ": " + folderPath)
 	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
+	OK.Println("Watching " + folder.ID + ": " + folderPath)
 	if folder.RescanIntervalS < 1800 {
-		log.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
+		OK.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
 	}
 	for {
 		evPath := waitForEvent(sw)
 		ev := relativePath(evPath, folderPath)
-		println("Change detected in: " + evPath)
 		if shouldIgnore(ignorePaths, ignorePatterns, ev) {
 			continue
 		}
+		Trace.Println("Change detected in: " + evPath)
 		fsInput <- ev
 	}
 }
@@ -227,11 +254,11 @@ func waitForEvent(sw *SyncWatcher) string {
 	select {
 	case ev, ok := <-sw.Event:
 		if !ok {
-			log.Println("Error: channel closed")
+			Warning.Println("Error: channel closed")
 		}
 		return ev.Name
 	case err, eok := <-sw.Error:
-		log.Println(err, eok)
+		Warning.Println(err, eok)
 	}
 	return ""
 }
@@ -299,11 +326,11 @@ func testWebGuiPost() error {
 		}
 	}()
 	if err != nil {
-		log.Println("Cannot connect to Syncthing:", err)
+		Warning.Println("Cannot connect to Syncthing:", err)
 		return err
 	}
 	if res.StatusCode != 404 {
-		log.Printf("Cannot connect to Syncthing, Status %d != 404 for POST\n", res.StatusCode)
+		Warning.Printf("Cannot connect to Syncthing, Status %d != 404 for POST\n", res.StatusCode)
 		return errors.New("Invalid HTTP status code")
 	}
 	return nil
@@ -321,14 +348,14 @@ func informChange(folder string, sub string) error {
 		}
 	}()
 	if err != nil {
-		log.Println("Failed to perform request", err)
+		Warning.Println("Failed to perform request", err)
 		return err
 	}
 	if res.StatusCode != 200 {
-		log.Printf("Error: Status %d != 200 for POST.\n"+folder+": "+sub, res.StatusCode)
+		Warning.Printf("Error: Status %d != 200 for POST.\n"+folder+": "+sub, res.StatusCode)
 		return errors.New("Invalid HTTP status code")
 	} else {
-		log.Println("Syncthing is indexing change in " + folder + ": " + sub)
+		Trace.Println("Syncthing is indexing change in " + folder + ": " + sub)
 	}
 	// Wait until scan finishes
 	_, err = ioutil.ReadAll(res.Body)
@@ -347,11 +374,13 @@ func accumulateChanges(interval time.Duration,
 			if item.Path == "" {
 				// Prepare for incoming changes
 				currInterval = remoteIndexTimeout
+				Debug.Println("Incoming Changes")
 				continue
 			}
 			if item.Finished {
 				// Ensure path is cleared when receiving itemFinished
 				delete(inProgress, item.Path)
+				Debug.Println("Remove Tracking ST: " + item.Path)
 				continue
 			}
 			if len(inProgress) > maxFiles {
@@ -363,6 +392,7 @@ func accumulateChanges(interval time.Duration,
 			if p && ok {
 				// Change originated from ST
 				delete(inProgress, item)
+				Debug.Println("Remove Tracking FS: " + item)
 				continue
 			}
 			if len(inProgress) > maxFiles {
@@ -391,6 +421,7 @@ func accumulateChanges(interval time.Duration,
 			if err == nil {
 				for _, path := range paths {
 					delete(inProgress, path)
+					Debug.Println("Remove Tracking Informed: " + path)
 				}
 			}
 		}
@@ -402,7 +433,7 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	//	- If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 	//	- Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
 	if len(paths) == 0 {
-		return nil
+		return errors.New("No changes to aggregate")
 	}
 	trackedPaths := make(map[string]int) // Map directories to scores; if score == -1 the path is a filename
 	sort.Strings(paths)                  // Make sure parent paths are processed first
@@ -511,13 +542,16 @@ func getSTEvents(lastSeenID int) ([]Event, error) {
 			res.Body.Close()
 		}
 	}()
+	if err != nil {
+		Warning.Println("Failed to perform request", err)
+		return nil, err
+	}
 	if res.StatusCode != 200 {
-		log.Printf("Status %d != 200 for GET", res.StatusCode)
+		Warning.Printf("Status %d != 200 for GET", res.StatusCode)
 		return nil, errors.New("Invalid HTTP status code")
 	}
 	bs, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 	var events []Event
@@ -537,7 +571,7 @@ func getHomeDir() string {
 		home = os.Getenv("HOME")
 	}
 	if home == "" {
-		log.Fatal("No home path found - set $HOME (or the platform equivalent).")
+		log.Fatalln("No home path found - set $HOME (or the platform equivalent).")
 	}
 	return home
 }
