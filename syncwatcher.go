@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -144,6 +145,30 @@ func main() {
 	OK.Println("Exiting")
 	os.Exit(code)
 
+}
+
+func restart() bool {
+	pgm, err := exec.LookPath(os.Args[0])
+	if err != nil {
+		Warning.Println("Cannot restart:", err)
+		return false
+	}
+	env := os.Environ()
+	newEnv := make([]string, 0, len(env))
+	for _, s := range env {
+		newEnv = append(newEnv, s)
+	}
+	proc, err := os.StartProcess(pgm, os.Args, &os.ProcAttr{
+		Env:   newEnv,
+		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
+	})
+	if err != nil {
+		Warning.Println("Cannot restart:", err)
+		return false
+	}
+	proc.Release()
+	stop <- 0
+	return true
 }
 
 func getIgnorePatterns(folder string) []Pattern {
@@ -581,8 +606,10 @@ func waitForSyncAndExitIfNeeded(folders []FolderConfiguration) {
 		// Simply exit as folders:
 		// - can be added (still ok)
 		// - can be removed as well (requires informing tons of goroutines...)
-		log.Fatalln("Syncthing folder configuration updated, exiting...")
-		os.Exit(1)
+		OK.Println("Syncthing folder configuration updated, restarting")
+		if !restart() {
+			log.Fatalln("Cannot restart syncthing-inotify, exiting")
+		}
 	}
 }
 
