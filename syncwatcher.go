@@ -70,7 +70,7 @@ var (
 
 // HTTP Debounce
 var (
-	debounceTimeout    = 300 * time.Millisecond
+	debounceTimeout    = 500 * time.Millisecond
 	remoteIndexTimeout = 600 * time.Millisecond
 	configSyncTimeout  = 5 * time.Second
 	dirVsFiles         = 100
@@ -173,6 +173,7 @@ func restart() bool {
 
 func getIgnorePatterns(folder string) []Pattern {
 	for {
+		Trace.Println("Getting Ignore Patterns: " + folder)
 		r, err := http.NewRequest("GET", target+"/rest/ignores?folder="+folder, nil)
 		res, err := performRequest(r)
 		defer func() {
@@ -216,6 +217,7 @@ func getIgnorePatterns(folder string) []Pattern {
 }
 
 func getFolders() []FolderConfiguration {
+	Trace.Println("Getting Folders")
 	r, err := http.NewRequest("GET", target+"/rest/config", nil)
 	res, err := performRequest(r)
 	defer func() {
@@ -263,6 +265,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	}
 	for {
 		evPath := waitForEvent(sw)
+		Debug.Println("Change detected in: " + evPath + " (could still be ignored)")
 		ev := relativePath(evPath, folderPath)
 		if shouldIgnore(ignorePaths, ignorePatterns, ev) {
 			continue
@@ -302,22 +305,22 @@ func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) b
 	}
 	for _, ignorePath := range ignorePaths {
 		if strings.Contains(path, ignorePath) {
+			Debug.Println("Ignoring", path)
 			return true
 		}
 	}
 	for _, p1 := range ignorePatterns {
-		//l.Debugln("Testing", path, "to", p1.match.String())
 		if p1.include && p1.match.MatchString(path) {
 			keep := false
 			for _, p2 := range ignorePatterns {
 				if !p2.include && p2.match.MatchString(path) {
-					//l.Debugln("Keeping", path, "because", p2.match.String())
+					Debug.Println("Keeping", path, "because", p2.match.String())
 					keep = true
 					break
 				}
 			}
 			if !keep {
-				//l.Debugln("Ignoring", path)
+				Debug.Println("Ignoring", path)
 				return true
 			}
 		}
@@ -351,6 +354,7 @@ func performRequest(r *http.Request) (*http.Response, error) {
 }
 
 func testWebGuiPost() error {
+	Trace.Println("Testing WebGUI")
 	r, err := http.NewRequest("POST", target+"/rest/404", nil)
 	res, err := performRequest(r)
 	defer func() {
@@ -373,6 +377,7 @@ func informChange(folder string, sub string) error {
 	data := url.Values{}
 	data.Set("folder", folder)
 	data.Set("sub", sub)
+	Trace.Println("Informing ST: " + folder + " :" + sub)
 	r, _ := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
 	res, err := performRequest(r)
 	defer func() {
@@ -388,7 +393,7 @@ func informChange(folder string, sub string) error {
 		Warning.Printf("Error: Status %d != 200 for POST.\n"+folder+": "+sub, res.StatusCode)
 		return errors.New("Invalid HTTP status code")
 	} else {
-		Trace.Println("Syncthing is indexing change in " + folder + ": " + sub)
+		OK.Println("Syncthing is indexing change in " + folder + ": " + sub)
 	}
 	// Wait until scan finishes
 	_, err = ioutil.ReadAll(res.Body)
@@ -404,6 +409,7 @@ func accumulateChanges(interval time.Duration,
 	for {
 		select {
 		case item := <-stInput:
+			Debug.Println("STInput")
 			if item.Path == "" {
 				// Prepare for incoming changes
 				currInterval = remoteIndexTimeout
@@ -421,6 +427,7 @@ func accumulateChanges(interval time.Duration,
 			}
 			inProgress[item.Path] = true
 		case item := <-fsInput:
+			Debug.Println("FSInput")
 			p, ok := inProgress[item]
 			if p && ok {
 				// Change originated from ST
@@ -434,16 +441,26 @@ func accumulateChanges(interval time.Duration,
 			inProgress[item] = false
 		case <-time.After(currInterval):
 			currInterval = interval
+			if len(inProgress) == 0 {
+				continue
+			}
+			Debug.Println("Timeout AccumulateChanges")
 			var err error
 			var paths []string
 			if len(inProgress) < maxFiles {
 				paths = make([]string, len(inProgress))
 				i := 0
-				for k, p := range inProgress {
-					if !p {
-						paths[i] = k
+				for path, progress := range inProgress {
+					if !progress {
+						paths[i] = path
 						i++
+					} else {
+						Debug.Println("Waiting for: " + path)
 					}
+				}
+				if len(paths) == 0 {
+					Debug.Println("Empty paths")
+					continue
 				}
 				// Try to inform changes to syncthing and if succeeded, clean up
 				err = aggregateChanges(folder, folderPath, dirVsFiles, callback, paths)
@@ -568,6 +585,7 @@ func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguratio
 }
 
 func getSTEvents(lastSeenID int) ([]Event, error) {
+	Trace.Println("Requesting STEvents: " + strconv.Itoa(lastSeenID))
 	r, err := http.NewRequest("GET", target+"/rest/events?since="+strconv.Itoa(lastSeenID), nil)
 	res, err := performRequest(r)
 	defer func() {
@@ -621,6 +639,7 @@ func waitForSyncAndExitIfNeeded(folders []FolderConfiguration) {
 
 func waitForSync() {
 	for {
+		Trace.Println("Waiting for Sync")
 		r, err := http.NewRequest("GET", target+"/rest/config/sync", nil)
 		res, err := performRequest(r)
 		defer func() {
