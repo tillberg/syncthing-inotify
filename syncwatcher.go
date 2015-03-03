@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"crypto/tls"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"flag"
 	"fmt"
@@ -53,6 +54,13 @@ type STEvent struct {
 	Finished bool
 }
 
+type STConfig struct {
+	CsrfFile string
+	ApiKey   string `xml:"gui>apikey"`
+	Target   string `xml:"gui>address"`
+	AuthUser string `xml:"gui.user"`
+}
+
 // HTTP Authentication
 var (
 	target    string
@@ -89,14 +97,17 @@ var (
 )
 
 func init() {
+	c, _ := getSTConfig()
+
 	var verbosity int
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
-	flag.StringVar(&target, "target", "localhost:8080", "Target")
-	flag.StringVar(&authUser, "user", "", "Username")
+	flag.StringVar(&target, "target", c.Target, "Target")
+	flag.StringVar(&authUser, "user", c.AuthUser, "Username")
 	flag.StringVar(&authPass, "pass", "", "Password")
 	flag.StringVar(&csrfFile, "csrf", "", "CSRF token file")
-	flag.StringVar(&apiKey, "api", "", "API key")
+	flag.StringVar(&apiKey, "api", c.ApiKey, "API key")
 	flag.Parse()
+
 	if verbosity >= 1 {
 		Warning = log.New(os.Stdout, "[WARNING] ", log.Ldate|log.Ltime|log.Lshortfile)
 	}
@@ -697,4 +708,40 @@ func expandTilde(p string) string {
 		return p
 	}
 	return filepath.Join(getHomeDir(), p[2:])
+}
+
+func getSTConfig() (STConfig, error) {
+	var path = filepath.Join(getSTDefaultConfDir(), "config.xml")
+	c := STConfig{Target: "localhost:8080"}
+
+	if file, err := os.Open(path); err != nil {
+		return c, err
+	} else {
+		err := xml.NewDecoder(file).Decode(&c)
+		if err != nil {
+			return c, err
+		}
+	}
+
+	// This is not in the XML, but we can determine a sane default
+	c.CsrfFile = filepath.Join(getSTDefaultConfDir(), "csrftokens.txt")
+
+	return c, nil
+}
+
+// inspired by syncthing/cmd/syncthing/main.go#L941
+func getSTDefaultConfDir() string {
+	switch runtime.GOOS {
+	case "windows":
+		return filepath.Join(os.Getenv("LocalAppData"), "Syncthing")
+
+	case "darwin":
+		return expandTilde("~/Library/Application Support/Syncthing")
+
+	default:
+		if xdgCfg := os.Getenv("XDG_CONFIG_HOME"); xdgCfg != "" {
+			return filepath.Join(xdgCfg, "syncthing")
+		}
+		return expandTilde("~/.config/syncthing")
+	}
 }
