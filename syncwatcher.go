@@ -525,7 +525,13 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguration) {
 	lastSeenID := 0
 	for {
-		events, _ := getSTEvents(lastSeenID)
+		events, err := getSTEvents(lastSeenID)
+		if err != nil {
+			// Probably Syncthing restarted
+			lastSeenID = 0
+			time.Sleep(configSyncTimeout)
+			continue
+		}
 		if events == nil {
 			continue
 		}
