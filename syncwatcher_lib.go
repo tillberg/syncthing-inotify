@@ -158,8 +158,8 @@ func (w *SyncWatcher) watch(path string) error {
 	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
 			if shouldIgnore(w.ignorePaths, w.ignorePatterns, relativePath(p, w.mainPath)) {
-				//println("Ignoring: " + p)
-				return err
+				Debug.Println("Ignoring: " + p)
+				return filepath.SkipDir
 			}
 			err = w.watcher.Add(p)
 			if err == nil {

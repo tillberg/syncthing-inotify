@@ -175,6 +175,7 @@ func main() {
 	}
 	stChans := make(map[string]chan STEvent, len(folders))
 	for _, folder := range folders {
+		Debug.Println("Installing watch for " + folder.ID)
 		stChan := make(chan STEvent)
 		stChans[folder.ID] = stChan
 		go watchFolder(folder, stChan)
@@ -295,7 +296,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	defer sw.Close()
 	err = sw.Watch(folderPath)
 	if err != nil {
-		Warning.Println(err)
+		Warning.Println(err) // TODO CHECK WATCH: does it exit all for loops when returning an error?
 		return
 	}
 	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
