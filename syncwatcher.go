@@ -67,6 +67,18 @@ type STConfig struct {
 	TLS      bool   `xml:"tls,attr"`
 }
 
+type folderSlice []string
+
+func (fs *folderSlice) String() string {
+	return fmt.Sprint(*fs)
+}
+func (fs *folderSlice) Set(value string) error {
+	for _, f := range strings.Split(value, ",") {
+		*fs = append(*fs, f)
+	}
+	return nil
+}
+
 // HTTP Authentication
 var (
 	target    string
@@ -93,13 +105,15 @@ var (
 
 // Main
 var (
-	stop        = make(chan int)
-	ignorePaths = []string{".stversions", ".stfolder", ".stignore", ".syncthing"}
-	Discard     = log.New(ioutil.Discard, "", log.Ldate)
-	Warning     = Discard // 1
-	OK          = Discard
-	Trace       = Discard
-	Debug       = Discard // 4
+	stop         = make(chan int)
+	ignorePaths  = []string{".stversions", ".stfolder", ".stignore", ".syncthing"}
+	Discard      = log.New(ioutil.Discard, "", log.Ldate)
+	Warning      = Discard // 1
+	OK           = Discard
+	Trace        = Discard
+	Debug        = Discard // 4
+	watchFolders folderSlice
+	skipFolders  folderSlice
 )
 
 func init() {
@@ -123,6 +137,8 @@ func init() {
 	flag.StringVar(&apiKey, "api", c.ApiKey, "API key")
 	flag.BoolVar(&apiKeyStdin, "api-stdin", false, "Provide API key through stdin")
 	flag.BoolVar(&authPassStdin, "password-stdin", false, "Provide password through stdin")
+	flag.Var(&watchFolders, "folders", "A comma-separated list of folders to watch (all by default)")
+	flag.Var(&skipFolders, "skip-folders", "A comma-separated list of folders to skip inotify watching")
 	flag.Parse()
 
 	if verbosity >= 1 {
@@ -162,16 +178,19 @@ func init() {
 		stdin := bufio.NewReader(os.Stdin)
 		authPass, _ = stdin.ReadString('\n')
 	}
-
+	if len(watchFolders) != 0 && len(skipFolders) != 0 {
+		log.Fatalln("Either provide a list of folders to be watched or to be ignored. Not both.")
+	}
 }
 
 func main() {
 
 	backoff.Retry(testWebGuiPost, backoff.NewExponentialBackOff())
 
-	folders := getFolders()
+	allFolders := getFolders()
+	folders := filterFolders(allFolders)
 	if len(folders) == 0 {
-		log.Fatalln("No folders found")
+		log.Fatalln("No folders to be watched, exiting...")
 	}
 	stChans := make(map[string]chan STEvent, len(folders))
 	for _, folder := range folders {
@@ -180,7 +199,7 @@ func main() {
 		stChans[folder.ID] = stChan
 		go watchFolder(folder, stChan)
 	}
-	go watchSTEvents(stChans, folders) // Note: Lose thread ownership of stChans
+	go watchSTEvents(stChans, allFolders) // Note: Lose thread ownership of stChans
 
 	code := <-stop
 	OK.Println("Exiting")
@@ -210,6 +229,39 @@ func restart() bool {
 	proc.Release()
 	stop <- 0
 	return true
+}
+
+func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
+	if len(watchFolders) > 0 {
+		var fs []FolderConfiguration
+		for _, f := range folders {
+			for _, watch := range watchFolders {
+				if f.ID == watch {
+					fs = append(fs, f)
+					break
+				}
+			}
+		}
+		return fs
+	}
+	if len(skipFolders) > 0 {
+		var fs []FolderConfiguration
+		for _, f := range folders {
+			keep := true
+			for _, skip := range skipFolders {
+				if f.ID == skip {
+					keep = false
+					break
+				}
+			}
+			if keep {
+				fs = append(fs, f)
+				break
+			}
+		}
+		return fs
+	}
+	return folders
 }
 
 func getIgnorePatterns(folder string) []Pattern {
