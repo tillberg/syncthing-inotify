@@ -32,6 +32,8 @@ go build
 
 
 #### Troubleshooting (OSX)
-* The Go bindings for inotify do not support recursive watching on OSX. Therefore, when watching many files on OSX, we might not have enough inotify handles available and the app exits with the message:```no space left on device```. This is an [open issue](https://github.com/syncthing/syncthing-inotify/issues/8).
+* The Go bindings for inotify do not support recursive watching on OSX. Therefore, when watching many files on OSX, we might not have enough inotify handles available and the app exits with the message:```no space left on device```. This is an [open issue](https://github.com/syncthing/syncthing-inotify/issues/8) and [common for other applications as well ](http://superuser.com/a/443168). Linux might also be affected by this issue when you have many subdirectories.
 
-  Temporary fix: ```sudo sh -c 'echo 262144 > /proc/sys/fs/inotify/max_user_watches'```
+  Temporary fix for OSX: ```sudo sh -c 'echo kern.maxfiles=20480\\nkern.maxfilesperproc=18000 >> /etc/sysctl.conf'```
+  
+  Temporary fix for Linux: ```sudo sh -c 'echo 262144 > /proc/sys/fs/inotify/max_user_watches'```

@@ -1,0 +1,12 @@
+[Unit]
+Description=Syncthing Inotify File Watcher for %I
+Documentation=https://github.com/syncthing/syncthing-inotify/blob/master/README.md
+After=network.target syncthing@.service
+Requires=syncthing@.service
+
+[Service]
+User=%i
+ExecStart=/usr/bin/syncthing-inotify
+
+[Install]
+WantedBy=multi-user.target
