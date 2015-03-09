@@ -54,11 +54,17 @@ type STEvent struct {
 	Finished bool
 }
 
+type STNestedConfig struct {
+	Config STConfig `xml:"gui"`
+}
+
 type STConfig struct {
 	CsrfFile string
-	ApiKey   string `xml:"gui>apikey"`
-	Target   string `xml:"gui>address"`
-	AuthUser string `xml:"gui.user"`
+	ApiKey   string `xml:"apikey"`
+	Target   string `xml:"address"`
+	AuthUser string `xml:"user"`
+	AuthPass string `xml:"password"`
+	TLS      bool   `xml:"tls,attr"`
 }
 
 // HTTP Authentication
@@ -98,14 +104,25 @@ var (
 
 func init() {
 	c, _ := getSTConfig()
+	if !strings.Contains(c.Target, "://") {
+		if c.TLS {
+			target = "https://" + c.Target
+		} else {
+			target = "http://" + c.Target
+		}
+	}
 
 	var verbosity int
+	var apiKeyStdin bool
+	var authPassStdin bool
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
-	flag.StringVar(&target, "target", c.Target, "Target")
+	flag.StringVar(&target, "target", target, "Target url, prepend with https:// for TLS")
 	flag.StringVar(&authUser, "user", c.AuthUser, "Username")
-	flag.StringVar(&authPass, "pass", "", "Password")
+	flag.StringVar(&authPass, "password", "***", "Password")
 	flag.StringVar(&csrfFile, "csrf", "", "CSRF token file")
 	flag.StringVar(&apiKey, "api", c.ApiKey, "API key")
+	flag.BoolVar(&apiKeyStdin, "api-stdin", false, "Provide API key through stdin")
+	flag.BoolVar(&authPassStdin, "password-stdin", false, "Provide password through stdin")
 	flag.Parse()
 
 	if verbosity >= 1 {
@@ -134,6 +151,18 @@ func init() {
 		}
 		fd.Close()
 	}
+	if apiKeyStdin && authPassStdin {
+		log.Fatalln("Either provide an API or password through stdin")
+	}
+	if apiKeyStdin {
+		stdin := bufio.NewReader(os.Stdin)
+		apiKey, _ = stdin.ReadString('\n')
+	}
+	if authPassStdin {
+		stdin := bufio.NewReader(os.Stdin)
+		authPass, _ = stdin.ReadString('\n')
+	}
+
 }
 
 func main() {
@@ -712,24 +741,22 @@ func expandTilde(p string) string {
 
 func getSTConfig() (STConfig, error) {
 	var path = filepath.Join(getSTDefaultConfDir(), "config.xml")
-	c := STConfig{Target: "localhost:8080"}
-
+	nc := STNestedConfig{Config: STConfig{Target: "localhost:8080"}}
 	if file, err := os.Open(path); err != nil {
-		return c, err
+		return nc.Config, err
 	} else {
-		err := xml.NewDecoder(file).Decode(&c)
+		err := xml.NewDecoder(file).Decode(&nc)
 		if err != nil {
-			return c, err
+			log.Fatal(err)
+			return nc.Config, err
 		}
 	}
-
 	// This is not in the XML, but we can determine a sane default
-	c.CsrfFile = filepath.Join(getSTDefaultConfDir(), "csrftokens.txt")
-
-	return c, nil
+	nc.Config.CsrfFile = filepath.Join(getSTDefaultConfDir(), "csrftokens.txt")
+	return nc.Config, nil
 }
 
-// inspired by syncthing/cmd/syncthing/main.go#L941
+// inspired by https://github.com/syncthing/syncthing/blob/03bbf273b3614d97a4c642e466e8c5bfb39ef595/cmd/syncthing/main.go#L943
 func getSTDefaultConfDir() string {
 	switch runtime.GOOS {
 	case "windows":
