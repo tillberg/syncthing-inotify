@@ -7,6 +7,9 @@ Requires=syncthing.service
 [Service]
 ExecStart=/usr/bin/syncthing-inotify
 Restart=on-failure
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
 
 [Install]
 WantedBy=default.target
