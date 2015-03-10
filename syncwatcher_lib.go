@@ -155,12 +155,19 @@ func (w *SyncWatcher) watch(path string) error {
 	w.pathMutex.Lock()
 	defer w.pathMutex.Unlock()
 
+	seen := make(map[string]bool) // Used to block recursive symlinks
 	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
 			if shouldIgnore(w.ignorePaths, w.ignorePatterns, relativePath(p, w.mainPath)) {
 				Debug.Println("Ignoring: " + p)
 				return filepath.SkipDir
 			}
+			sp, _ := filepath.EvalSymlinks(p)
+			if _, ok := seen[sp]; ok {
+				Debug.Println("Ignoring recursive loop: " + p)
+				return filepath.SkipDir
+			}
+			seen[sp] = true
 			err = w.watcher.Add(p)
 			if err == nil {
 				w.paths[p] = ""
