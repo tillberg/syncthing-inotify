@@ -130,7 +130,7 @@ func init() {
 	var apiKeyStdin bool
 	var authPassStdin bool
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
-	flag.StringVar(&target, "target", target, "Target url, prepend with https:// for TLS")
+	flag.StringVar(&target, "target", target, "Target url (prepend with https:// for TLS)")
 	flag.StringVar(&authUser, "user", c.AuthUser, "Username")
 	flag.StringVar(&authPass, "password", "***", "Password")
 	flag.StringVar(&csrfFile, "csrf", "", "CSRF token file")
