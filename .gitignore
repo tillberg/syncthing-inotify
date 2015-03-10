@@ -1,4 +1,2 @@
 *~
-syncthing-inotify*
-!syncthing-inotify.service
-!syncthing-inotify@.service
+/syncthing-inotify*
