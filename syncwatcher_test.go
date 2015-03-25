@@ -56,7 +56,7 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	fsChan <- testDirectory + slash + testFile
-	time.Sleep(testDebounceTimeout * 2)
+	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
@@ -84,7 +84,7 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 2)
+	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
@@ -119,7 +119,7 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 2)
+	time.Sleep(testDebounceTimeout * 10)
 	if testOK != 2 {
 		t.Error("Callback not correctly triggered")
 	}
@@ -149,7 +149,7 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 2)
+	time.Sleep(testDebounceTimeout * 10)
 	if testOK != 3 {
 		t.Error("Callback not correctly triggered")
 	}
@@ -189,7 +189,7 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 2)
+	time.Sleep(testDebounceTimeout * 10)
 	if testOK != 2 {
 		t.Error("Callback not correctly triggered")
 	}
@@ -221,7 +221,7 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 2)
+	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
 		t.Error("Callback not correctly triggered")
 	}
@@ -254,7 +254,7 @@ func TestSTEvents(t *testing.T) {
 		fsChan <- testDirectory + slash + testFiles[i]
 		stChan <- STEvent{Path: testDirectory + slash + testFiles[i], Finished: true}
 	}
-	time.Sleep(testDebounceTimeout * 2)
+	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
 		t.Error("Callback not correctly triggered")
 	}
