@@ -348,8 +348,13 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	defer sw.Close()
 	err = sw.Watch(folderPath)
 	if err != nil {
-		Warning.Println(err) // TODO CHECK WATCH: does it exit all for loops when returning an error?
-		return
+		Warning.Println("Failed to watch", folderPath)
+		if strings.Contains(err.Error(), "no space left on device") {
+			Warning.Println("Please use the following workaround:")
+			Warning.Println("(OSX)   sudo sh -c 'echo kern.maxfiles=20480\\nkern.maxfilesperproc=18000 >> /etc/sysctl.conf'")
+			Warning.Println("(Linux) sudo sh -c 'echo fs.inotify.max_user_watches=20480\\n >> /etc/sysctl.conf'")
+		}
+		log.Fatalln(err)
 	}
 	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
 	OK.Println("Watching " + folder.ID + ": " + folderPath)

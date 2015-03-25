@@ -42,4 +42,4 @@ go build
 
   Temporary fix for OSX: ```sudo sh -c 'echo kern.maxfiles=20480\\nkern.maxfilesperproc=18000 >> /etc/sysctl.conf'```
 
-  Temporary fix for Linux: ```sudo sh -c 'echo 262144 > /proc/sys/fs/inotify/max_user_watches'```
+  Temporary fix for Linux: ```sudo sh -c 'echo fs.inotify.max_user_watches=20480\n >> /etc/sysctl.conf'```
