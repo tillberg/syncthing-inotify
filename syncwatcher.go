@@ -587,28 +587,36 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	sort.Strings(paths)                  // Make sure parent paths are processed first
 	previousPath := ""                   // Filter duplicates
 	for i := range paths {
-		path := paths[i]
+		path := filepath.Clean(paths[i])
 		if path == previousPath {
 			continue
 		}
 		previousPath = path
-		dir := filepath.Dir(path)
-		score := 1 // File change counts for 1 per directory
-		if dir == filepath.Clean(path) {
-			score = dirVsFiles // Is directory itself, should definitely inform
+		fi, _ := os.Stat(path)
+		path = strings.TrimPrefix(path, folderPath)
+		path = strings.TrimPrefix(path, string(os.PathSeparator))
+		var dir string
+		if fi != nil && fi.IsDir() {
+			// Is directory itself, should definitely inform
+			dir = path
+			trackedPaths[path] = dirVsFiles
+		} else {
+			// Files are linked to -1 scores
+			// Also increment the parent path with 1
+			dir = filepath.Dir(path)
+			if dir == "." {
+				dir = ""
+			}
+			trackedPaths[path] = -1
+			trackedPaths[dir] += 1
 		}
 		// Search for existing parent directory relations in the map
 		for trackedPath, _ := range trackedPaths {
 			if strings.HasPrefix(dir, trackedPath) {
 				// Increment score of tracked current/parent directory
-				trackedPaths[trackedPath] += score
+				trackedPaths[trackedPath] += 1 // for each file
 			}
 		}
-		_, exists := trackedPaths[dir]
-		if !exists {
-			trackedPaths[dir] = score
-		}
-		trackedPaths[path] = -1
 	}
 	var keys []string
 	for k := range trackedPaths {
