@@ -471,11 +471,13 @@ func testWebGuiPost() error {
 	return nil
 }
 
-func informChange(folder string, sub string) error {
+func informChange(folder string, subs []string) error {
 	data := url.Values{}
 	data.Set("folder", folder)
-	data.Set("sub", sub)
-	Trace.Println("Informing ST: " + folder + " :" + sub)
+	for _, sub := range subs {
+		data.Add("sub", sub)
+	}
+	Trace.Printf("Informing ST: %v: %v", folder, subs)
 	r, _ := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
 	res, err := performRequest(r)
 	defer func() {
@@ -488,10 +490,10 @@ func informChange(folder string, sub string) error {
 		return err
 	}
 	if res.StatusCode != 200 {
-		Warning.Printf("Error: Status %d != 200 for POST.\n"+folder+": "+sub, res.StatusCode)
+		Warning.Printf("Error: Status %d != 200 for POST.\n%v: %v %v", folder, res.StatusCode)
 		return errors.New("Invalid HTTP status code")
 	} else {
-		OK.Println("Syncthing is indexing change in " + folder + ": " + sub)
+		OK.Printf("Syncthing is indexing change in %v: %v", folder, subs)
 	}
 	// Wait until scan finishes
 	_, err = ioutil.ReadAll(res.Body)
@@ -501,7 +503,7 @@ func informChange(folder string, sub string) error {
 func accumulateChanges(interval time.Duration,
 	folder string, folderPath string, dirVsFiles int,
 	stInput chan STEvent, fsInput chan string,
-	callback func(folder string, sub string) error) func(string) {
+	callback func(folder string, subs []string) error) func(string) {
 	inProgress := make(map[string]bool) // [Path string, InProgress bool]
 	currInterval := interval
 	for {
@@ -576,7 +578,7 @@ func accumulateChanges(interval time.Duration,
 	}
 }
 
-func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback func(folder string, folderPath string) error, paths []string) error {
+func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback func(folder string, folderPaths []string) error, paths []string) error {
 	// This function optimises tracking in two ways:
 	//	- If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 	//	- Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
@@ -624,6 +626,7 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	}
 	sort.Strings(keys) // Sort directories before their own files
 	previousDone, previousPath := false, ""
+	var scans []string
 	for i := range keys {
 		trackedPath := keys[i]
 		trackedPathScore, _ := trackedPaths[trackedPath]
@@ -635,14 +638,9 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 		} // Not enough files for this directory or it is a file
 		previousDone = trackedPathScore != -1
 		previousPath = trackedPath
-		sub := strings.TrimPrefix(trackedPath, folderPath)
-		sub = strings.TrimPrefix(sub, string(os.PathSeparator))
-		err := callback(folder, sub)
-		if err != nil {
-			return err
-		}
+		scans = append(scans, trackedPath)
 	}
-	return nil
+	return callback(folder, scans)
 }
 
 func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguration) {
