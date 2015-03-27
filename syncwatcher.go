@@ -805,7 +805,7 @@ func expandTilde(p string) string {
 
 func getSTConfig() (STConfig, error) {
 	var path = filepath.Join(getSTDefaultConfDir(), "config.xml")
-	nc := STNestedConfig{Config: STConfig{Target: "localhost:8080"}}
+	nc := STNestedConfig{Config: STConfig{Target: "localhost:8384"}}
 	if file, err := os.Open(path); err != nil {
 		return nc.Config, err
 	} else {
