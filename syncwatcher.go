@@ -3,6 +3,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"encoding/xml"
@@ -10,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/cenkalti/backoff"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -22,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 	"time"
 )
 
@@ -116,6 +119,22 @@ var (
 	skipFolders  folderSlice
 )
 
+const (
+	usage      = "syncthing-inotify [options]"
+	extraUsage = `
+The -logflags value is a sum of the following:
+
+   1  Date
+   2  Time
+   4  Microsecond time
+   8  Long filename
+  16  Short filename
+
+I.e. to prefix each log line with date and time, set -logflags=3 (1 + 2 from
+above). The value 0 is used to disable all of the above. The default is to
+show time only (2).`
+)
+
 func init() {
 	c, _ := getSTConfig()
 	if !strings.Contains(c.Target, "://") {
@@ -127,9 +146,11 @@ func init() {
 	}
 
 	var verbosity int
+	var logflags int
 	var apiKeyStdin bool
 	var authPassStdin bool
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
+	flag.IntVar(&logflags, "logflags", 2, "Select information in log line prefix")
 	flag.StringVar(&target, "target", target, "Target url (prepend with https:// for TLS)")
 	flag.StringVar(&authUser, "user", c.AuthUser, "Username")
 	flag.StringVar(&authPass, "password", "***", "Password")
@@ -139,19 +160,21 @@ func init() {
 	flag.BoolVar(&authPassStdin, "password-stdin", false, "Provide password through stdin")
 	flag.Var(&watchFolders, "folders", "A comma-separated list of folders to watch (all by default)")
 	flag.Var(&skipFolders, "skip-folders", "A comma-separated list of folders to skip inotify watching")
+
+	flag.Usage = usageFor(flag.CommandLine, usage, fmt.Sprintf(extraUsage))
 	flag.Parse()
 
 	if verbosity >= 1 {
-		Warning = log.New(os.Stdout, "[WARNING] ", log.Ldate|log.Ltime|log.Lshortfile)
+		Warning = log.New(os.Stdout, "[WARNING] ", logflags)
 	}
 	if verbosity >= 2 {
-		OK = log.New(os.Stdout, "[OK] ", log.Ldate|log.Ltime|log.Lshortfile)
+		OK = log.New(os.Stdout, "[OK] ", logflags)
 	}
 	if verbosity >= 3 {
-		Trace = log.New(os.Stdout, "[TRACE] ", log.Ldate|log.Ltime|log.Lshortfile)
+		Trace = log.New(os.Stdout, "[TRACE] ", logflags)
 	}
 	if verbosity >= 4 {
-		Debug = log.New(os.Stdout, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
+		Debug = log.New(os.Stdout, "[DEBUG] ", logflags)
 	}
 	if !strings.Contains(target, "://") {
 		target = "http://" + target
@@ -801,6 +824,50 @@ func expandTilde(p string) string {
 		return p
 	}
 	return filepath.Join(getHomeDir(), p[2:])
+}
+func optionTable(w io.Writer, rows [][]string) {
+	tw := tabwriter.NewWriter(w, 2, 4, 2, ' ', 0)
+	for _, row := range rows {
+		for i, cell := range row {
+			if i > 0 {
+				tw.Write([]byte("\t"))
+			}
+			tw.Write([]byte(cell))
+		}
+		tw.Write([]byte("\n"))
+	}
+	tw.Flush()
+}
+
+func usageFor(fs *flag.FlagSet, usage string, extra string) func() {
+	return func() {
+		var b bytes.Buffer
+		b.WriteString("Usage:\n  " + usage + "\n")
+
+		var options [][]string
+		fs.VisitAll(func(f *flag.Flag) {
+			var opt = "  -" + f.Name
+
+			if f.DefValue == "[]" {
+				f.DefValue = ""
+			}
+			if f.DefValue != "false" {
+				opt += "=" + fmt.Sprintf(`"%s"`, f.DefValue)
+			}
+			options = append(options, []string{opt, f.Usage})
+		})
+
+		if len(options) > 0 {
+			b.WriteString("\nOptions:\n")
+			optionTable(&b, options)
+		}
+
+		fmt.Println(b.String())
+
+		if len(extra) > 0 {
+			fmt.Println(extra)
+		}
+	}
 }
 
 func getSTConfig() (STConfig, error) {
