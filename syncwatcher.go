@@ -10,7 +10,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/cenkalti/backoff"
 	"io"
 	"io/ioutil"
 	"log"
@@ -26,6 +25,9 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/cenkalti/backoff"
+	"github.com/rjeczalik/notify"
 )
 
 type Configuration struct {
@@ -202,7 +204,7 @@ func init() {
 		authPass, _ = stdin.ReadString('\n')
 	}
 	if len(watchFolders) != 0 && len(skipFolders) != 0 {
-		log.Fatalln("Either provide a list of folders to be watched or to be ignored. Not both.")
+		log.Fatalln("Either provide a list of folders to be watched or to be ignored, not both.")
 	}
 }
 
@@ -290,7 +292,7 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 func getIgnorePatterns(folder string) []Pattern {
 	for {
 		Trace.Println("Getting Ignore Patterns: " + folder)
-		r, err := http.NewRequest("GET", target+"/rest/ignores?folder="+folder, nil)
+		r, err := http.NewRequest("GET", target+"/rest/db/ignores?folder="+folder, nil)
 		res, err := performRequest(r)
 		defer func() {
 			if res != nil && res.Body != nil {
@@ -298,17 +300,17 @@ func getIgnorePatterns(folder string) []Pattern {
 			}
 		}()
 		if err != nil {
-			Warning.Println("Failed to perform request /rest/ignores: ", err)
+			Warning.Println("Failed to perform request /rest/db/ignores: ", err)
 			time.Sleep(configSyncTimeout)
 			continue
 		}
 		if res.StatusCode == 500 {
-			Warning.Println("Syncthing not ready in " + folder + " for /rest/ignores")
+			Warning.Println("Syncthing not ready in " + folder + " for /rest/db/ignores")
 			time.Sleep(configSyncTimeout)
 			continue
 		}
 		if res.StatusCode != 200 {
-			log.Fatalf("Status %d != 200 for GET /rest/ignores: ", res.StatusCode, res)
+			log.Fatalf("Status %d != 200 for GET /rest/db/ignores: ", res.StatusCode, res)
 		}
 		bs, err := ioutil.ReadAll(res.Body)
 		if err != nil {
@@ -334,7 +336,7 @@ func getIgnorePatterns(folder string) []Pattern {
 
 func getFolders() []FolderConfiguration {
 	Trace.Println("Getting Folders")
-	r, err := http.NewRequest("GET", target+"/rest/config", nil)
+	r, err := http.NewRequest("GET", target+"/rest/system/config", nil)
 	res, err := performRequest(r)
 	defer func() {
 		if res != nil && res.Body != nil {
@@ -342,10 +344,10 @@ func getFolders() []FolderConfiguration {
 		}
 	}()
 	if err != nil {
-		log.Fatalln("Failed to perform request /rest/config: ", err)
+		log.Fatalln("Failed to perform request /rest/system/config: ", err)
 	}
 	if res.StatusCode != 200 {
-		log.Fatalf("Status %d != 200 for GET /rest/config: ", res.StatusCode)
+		log.Fatalf("Status %d != 200 for GET /rest/system/config: ", res.StatusCode)
 	}
 	bs, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -363,29 +365,19 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	folderPath := expandTilde(folder.Path)
 	ignorePatterns := getIgnorePatterns(folder.ID)
 	fsInput := make(chan string)
-	sw, err := NewSyncWatcher(folderPath, ignorePaths, ignorePatterns)
-	if sw == nil || err != nil {
+	c := make(chan notify.EventInfo, 10)
+	if err := notify.Watch(folderPath+"/...", c, notify.All); err != nil {
 		Warning.Println(err)
 		return
 	}
-	defer sw.Close()
-	err = sw.Watch(folderPath)
-	if err != nil {
-		Warning.Println("Failed to watch", folderPath)
-		if strings.Contains(err.Error(), "no space left on device") {
-			Warning.Println("Please use the following workaround:")
-			Warning.Println("(OSX)   sudo sh -c 'echo kern.maxfiles=20480\\nkern.maxfilesperproc=18000 >> /etc/sysctl.conf'")
-			Warning.Println("(Linux) sudo sh -c 'echo fs.inotify.max_user_watches=20480\\n >> /etc/sysctl.conf'")
-		}
-		log.Fatalln(err)
-	}
+	defer notify.Stop(c)
 	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
 	OK.Println("Watching " + folder.ID + ": " + folderPath)
 	if folder.RescanIntervalS < 1800 {
 		OK.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
 	}
 	for {
-		evPath := waitForEvent(sw)
+		evPath := waitForEvent(c)
 		Debug.Println("Change detected in: " + evPath + " (could still be ignored)")
 		ev := relativePath(evPath, folderPath)
 		if shouldIgnore(ignorePaths, ignorePatterns, ev) {
@@ -407,15 +399,13 @@ func relativePath(path string, folderPath string) string {
 	return path
 }
 
-func waitForEvent(sw *SyncWatcher) string {
+func waitForEvent(c chan notify.EventInfo) string {
 	select {
-	case ev, ok := <-sw.Event:
+	case ev, ok := <-c:
 		if !ok {
 			Warning.Println("Error: channel closed")
 		}
-		return ev.Name
-	case err, eok := <-sw.Error:
-		Warning.Println(err, eok)
+		return ev.Path()
 	}
 	return ""
 }
@@ -476,7 +466,8 @@ func performRequest(r *http.Request) (*http.Response, error) {
 
 func testWebGuiPost() error {
 	Trace.Println("Testing WebGUI")
-	r, err := http.NewRequest("POST", target+"/rest/404", nil)
+	r, err := http.NewRequest("GET", target+"/rest/404", nil)
+	Warning.Println(target)
 	res, err := performRequest(r)
 	defer func() {
 		if res != nil && res.Body != nil {
@@ -487,8 +478,9 @@ func testWebGuiPost() error {
 		Warning.Println("Cannot connect to Syncthing:", err)
 		return err
 	}
+	body, _ := ioutil.ReadAll(res.Body)
 	if res.StatusCode != 404 {
-		Warning.Printf("Cannot connect to Syncthing, Status %d != 404 for POST\n", res.StatusCode)
+		Warning.Printf("Cannot connect to Syncthing, Status %d != 404 for POST\n", res.StatusCode, string(body))
 		return errors.New("Invalid HTTP status code")
 	}
 	return nil
@@ -499,7 +491,7 @@ func informChange(folder string, sub string) error {
 	data.Set("folder", folder)
 	data.Set("sub", sub)
 	Trace.Println("Informing ST: " + folder + " :" + sub)
-	r, _ := http.NewRequest("POST", target+"/rest/scan?"+data.Encode(), nil)
+	r, _ := http.NewRequest("POST", target+"/rest/db/scan?"+data.Encode(), nil)
 	res, err := performRequest(r)
 	defer func() {
 		if res != nil && res.Body != nil {
@@ -510,8 +502,9 @@ func informChange(folder string, sub string) error {
 		Warning.Println("Failed to perform request", err)
 		return err
 	}
+	body, _ := ioutil.ReadAll(res.Body)
 	if res.StatusCode != 200 {
-		Warning.Printf("Error: Status %d != 200 for POST.\n"+folder+": "+sub, res.StatusCode)
+		Warning.Printf("Error: Status %d != 200 for POST.\n"+folder+": "+sub, res.StatusCode, string(body))
 		return errors.New("Invalid HTTP status code")
 	} else {
 		OK.Println("Syncthing is indexing change in " + folder + ": " + sub)
@@ -769,7 +762,7 @@ func waitForSyncAndExitIfNeeded(folders []FolderConfiguration) {
 func waitForSync() {
 	for {
 		Trace.Println("Waiting for Sync")
-		r, err := http.NewRequest("GET", target+"/rest/config/sync", nil)
+		r, err := http.NewRequest("GET", target+"/rest/system/config/insync", nil)
 		res, err := performRequest(r)
 		defer func() {
 			if res != nil && res.Body != nil {
@@ -777,7 +770,7 @@ func waitForSync() {
 			}
 		}()
 		if err != nil {
-			Warning.Println("Failed to perform request /rest/config/sync", err)
+			Warning.Println("Failed to perform request /rest/system/config/insync", err)
 			time.Sleep(configSyncTimeout)
 			continue
 		}
