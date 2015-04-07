@@ -467,7 +467,6 @@ func performRequest(r *http.Request) (*http.Response, error) {
 func testWebGuiPost() error {
 	Trace.Println("Testing WebGUI")
 	r, err := http.NewRequest("GET", target+"/rest/404", nil)
-	Warning.Println(target)
 	res, err := performRequest(r)
 	defer func() {
 		if res != nil && res.Body != nil {
