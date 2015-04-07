@@ -5,7 +5,7 @@ After=network.target syncthing.service
 Requires=syncthing.service
 
 [Service]
-ExecStart=/usr/bin/syncthing-inotify
+ExecStart=/usr/bin/syncthing-inotify -logflags=0
 Restart=on-failure
 ProtectSystem=full
 ProtectHome=read-only
