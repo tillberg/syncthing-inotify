@@ -104,7 +104,7 @@ var (
 	debounceTimeout    = 500 * time.Millisecond
 	remoteIndexTimeout = 600 * time.Millisecond
 	configSyncTimeout  = 5 * time.Second
-	dirVsFiles         = 100
+	dirVsFiles         = 256
 	maxFiles           = 5000
 )
 
