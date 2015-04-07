@@ -367,7 +367,8 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	fsInput := make(chan string)
 	c := make(chan notify.EventInfo, 10)
 	if err := notify.Watch(folderPath+"/...", c, notify.All); err != nil {
-		Warning.Println(err)
+		Warning.Println("Failed to install inotify handlers", err)
+		informError("Failed to install inotify handler for " + folder.ID)
 		return
 	}
 	defer notify.Stop(c)
@@ -483,6 +484,27 @@ func testWebGuiPost() error {
 		return errors.New("Invalid HTTP status code")
 	}
 	return nil
+}
+
+func informError(msg string) error {
+	Trace.Printf("Informing ST about inotify error: %v", msg)
+	r, _ := http.NewRequest("POST", target+"/rest/system/error", strings.NewReader("[Inotify] "+msg))
+	r.Header.Set("Content-Type", "plain/text")
+	res, err := performRequest(r)
+	defer func() {
+		if res != nil && res.Body != nil {
+			res.Body.Close()
+		}
+	}()
+	if err != nil {
+		Warning.Println("Failed to inform Syncthing about", msg, err)
+		return err
+	}
+	if res.StatusCode != 200 {
+		Warning.Printf("Error: Status %d != 200 for POST.\n%v: %v %v", msg, res.StatusCode)
+		return errors.New("Invalid HTTP status code")
+	}
+	return err
 }
 
 func informChange(folder string, subs []string) error {
