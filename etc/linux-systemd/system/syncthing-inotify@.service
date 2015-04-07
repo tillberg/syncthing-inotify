@@ -6,7 +6,7 @@ Requires=syncthing@.service
 
 [Service]
 User=%i
-ExecStart=/usr/bin/syncthing-inotify
+ExecStart=/usr/bin/syncthing-inotify -logflags=0
 Restart=on-failure
 ProtectSystem=full
 ProtectHome=read-only
