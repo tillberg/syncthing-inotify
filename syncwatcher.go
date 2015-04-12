@@ -365,7 +365,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	folderPath := expandTilde(folder.Path)
 	ignorePatterns := getIgnorePatterns(folder.ID)
 	fsInput := make(chan string)
-	c := make(chan notify.EventInfo, 10)
+	c := make(chan notify.EventInfo, maxFiles)
 	if err := notify.Watch(folderPath+"/...", c, notify.All); err != nil {
 		Warning.Println(err)
 		return
