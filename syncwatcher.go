@@ -586,9 +586,12 @@ func accumulateChanges(interval time.Duration,
 			var err error
 			var paths []string
 			if len(inProgress) < maxFiles {
-				paths = make([]string, len(inProgress))
+				paths = make([]string, 0)
 				i := 0
 				for path, progress := range inProgress {
+					if path == "" {
+						continue
+					}
 					if !progress {
 						paths[i] = path
 						i++
