@@ -545,35 +545,37 @@ func accumulateChanges(interval time.Duration,
 	for {
 		select {
 		case item := <-stInput:
-			Debug.Println("STInput")
 			if item.Path == "" {
 				// Prepare for incoming changes
 				currInterval = remoteIndexTimeout
-				Debug.Println("Incoming Changes")
+				Debug.Println("[ST] Incoming Changes, increasing inotify timeout parameters")
 				continue
 			}
 			if item.Finished {
 				// Ensure path is cleared when receiving itemFinished
 				delete(inProgress, item.Path)
-				Debug.Println("Remove Tracking ST: " + item.Path)
+				Debug.Println("[ST] Removed tracking for: " + item.Path)
 				continue
 			}
 			if len(inProgress) > maxFiles {
+				Debug.Println("[ST] Tracking too many files, aggregating STEvent: " + item.Path)
 				continue
 			}
+			Debug.Println("[ST] Incoming: " + item.Path)
 			inProgress[item.Path] = true
 		case item := <-fsInput:
-			Debug.Println("FSInput")
 			p, ok := inProgress[item]
 			if p && ok {
 				// Change originated from ST
 				delete(inProgress, item)
-				Debug.Println("Remove Tracking FS: " + item)
+				Debug.Println("[FS] Removed tracking for: " + item)
 				continue
 			}
 			if len(inProgress) > maxFiles {
+				Debug.Println("[FS] Tracking too many files, aggregating FSEvent: " + item)
 				continue
 			}
+			Debug.Println("[FS] Tracking: " + item)
 			inProgress[item] = false
 		case <-time.After(currInterval):
 			currInterval = interval
@@ -590,6 +592,7 @@ func accumulateChanges(interval time.Duration,
 					if !progress {
 						paths[i] = path
 						i++
+						Debug.Println("Informing for: " + path)
 					} else {
 						Debug.Println("Waiting for: " + path)
 					}
@@ -598,6 +601,7 @@ func accumulateChanges(interval time.Duration,
 					Debug.Println("Empty paths")
 					continue
 				}
+
 				// Try to inform changes to syncthing and if succeeded, clean up
 				err = aggregateChanges(folder, folderPath, dirVsFiles, callback, paths)
 			} else {
@@ -607,7 +611,7 @@ func accumulateChanges(interval time.Duration,
 			if err == nil {
 				for _, path := range paths {
 					delete(inProgress, path)
-					Debug.Println("Remove Tracking Informed: " + path)
+					Debug.Println("[INFORMED] Removed tracking for: " + path)
 				}
 			}
 		}
@@ -684,7 +688,8 @@ func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguratio
 	for {
 		events, err := getSTEvents(lastSeenID)
 		if err != nil {
-			// Probably Syncthing restarted
+			// Syncthing probably restarted
+			Debug.Println("Resetting STEvents", err)
 			lastSeenID = 0
 			time.Sleep(configSyncTimeout)
 			continue
