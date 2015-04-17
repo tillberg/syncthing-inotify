@@ -291,7 +291,7 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 
 func getIgnorePatterns(folder string) []Pattern {
 	for {
-		Trace.Println("Getting Ignore Patterns: " + folder)
+		Trace.Println("Getting ignore patterns for " + folder)
 		r, err := http.NewRequest("GET", target+"/rest/db/ignores?folder="+folder, nil)
 		res, err := performRequest(r)
 		defer func() {
@@ -554,7 +554,7 @@ func accumulateChanges(interval time.Duration,
 			if item.Finished {
 				// Ensure path is cleared when receiving itemFinished
 				delete(inProgress, item.Path)
-				Debug.Println("[ST] Removed tracking for: " + item.Path)
+				Debug.Println("[ST] Removed tracking for " + item.Path)
 				continue
 			}
 			if len(inProgress) > maxFiles {
@@ -568,7 +568,7 @@ func accumulateChanges(interval time.Duration,
 			if p && ok {
 				// Change originated from ST
 				delete(inProgress, item)
-				Debug.Println("[FS] Removed tracking for: " + item)
+				Debug.Println("[FS] Removed tracking for " + item)
 				continue
 			}
 			if len(inProgress) > maxFiles {
@@ -586,18 +586,15 @@ func accumulateChanges(interval time.Duration,
 			var err error
 			var paths []string
 			if len(inProgress) < maxFiles {
-				paths = make([]string, 0)
-				i := 0
 				for path, progress := range inProgress {
 					if path == "" {
 						continue
 					}
 					if !progress {
-						paths[i] = path
-						i++
-						Debug.Println("Informing for: " + path)
+						paths = append(paths, path)
+						Debug.Println("Informing about " + path)
 					} else {
-						Debug.Println("Waiting for: " + path)
+						Debug.Println("Waiting for " + path)
 					}
 				}
 				if len(paths) == 0 {
@@ -614,7 +611,7 @@ func accumulateChanges(interval time.Duration,
 			if err == nil {
 				for _, path := range paths {
 					delete(inProgress, path)
-					Debug.Println("[INFORMED] Removed tracking for: " + path)
+					Debug.Println("[INFORMED] Removed tracking for " + path)
 				}
 			}
 		}
