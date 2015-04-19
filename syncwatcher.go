@@ -96,7 +96,7 @@ var (
 
 // HTTP Timeouts
 var (
-	requestTimeout = 30 * time.Second
+	requestTimeout = 180 * time.Second
 )
 
 // HTTP Debounce
@@ -688,6 +688,11 @@ func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguratio
 	for {
 		events, err := getSTEvents(lastSeenID)
 		if err != nil {
+			// Work-around for Go <1.5 (https://github.com/golang/go/issues/9405)
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				continue
+			}
+
 			// Syncthing probably restarted
 			Debug.Println("Resetting STEvents", err)
 			lastSeenID = 0
