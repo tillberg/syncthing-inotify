@@ -366,7 +366,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	ignorePatterns := getIgnorePatterns(folder.ID)
 	fsInput := make(chan string)
 	c := make(chan notify.EventInfo, maxFiles)
-	if err := notify.Watch(folderPath+"/...", c, notify.All); err != nil {
+	if err := notify.Watch(filepath.Join(folderPath, "..."), c, notify.All); err != nil {
 		Warning.Println("Failed to install inotify handlers", err)
 		informError("Failed to install inotify handler for " + folder.ID)
 		return
@@ -548,7 +548,7 @@ func accumulateChanges(interval time.Duration,
 			if item.Path == "" {
 				// Prepare for incoming changes
 				currInterval = remoteIndexTimeout
-				Debug.Println("[ST] Incoming Changes, increasing inotify timeout parameters")
+				Debug.Println("[ST] Incoming Changes for " + folder + ", increasing inotify timeout parameters")
 				continue
 			}
 			if item.Finished {
