@@ -306,6 +306,36 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 	}
 }
 
+func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
+	// Convert a a/b a/b/test.txt into a
+	testOK := 0
+	testRepo := "test1"
+	testFiles := createTestPaths(t,
+		"a"+slash,
+		"a"+slash+"b"+slash,
+		"a"+slash+"b"+slash+"file1.txt")
+	clearTestDir()
+	testDebounceTimeout := 20 * time.Millisecond
+	testDirVsFiles := 10
+	stChan := make(chan STEvent, 10)
+	fsChan := make(chan string, 10)
+	fileChange := func(repo string, sub []string) error {
+		if repo != testRepo || len(sub) != 1 || sub[0] != "a" {
+			t.Error("Invalid result for directory change: " + repo + " " + sub[0])
+		}
+		testOK += 1
+		return nil
+	}
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	for i := range testFiles {
+		fsChan <- testDirectory + slash + testFiles[i]
+	}
+	time.Sleep(testDebounceTimeout * 10)
+	if testOK != 1 {
+		t.Error("Callback not correctly triggered")
+	}
+}
+
 func TestSTEvents(t *testing.T) {
 	// Ignore notifications if ST created them
 	testOK := true

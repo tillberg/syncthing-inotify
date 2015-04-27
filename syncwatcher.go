@@ -638,8 +638,10 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 		path = strings.TrimPrefix(path, folderPath)
 		path = strings.TrimPrefix(path, string(os.PathSeparator))
 		var dir string
-		if fi != nil && fi.IsDir() {
-			// Is directory itself, should definitely inform
+		if fi == nil || fi.IsDir() {
+			// Definitely inform if:
+			// - If the path does not exist anymore
+			// - It is a directory
 			dir = path
 			trackedPaths[path] = dirVsFiles
 		} else {
