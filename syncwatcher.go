@@ -480,7 +480,7 @@ func testWebGuiPost() error {
 	}
 	body, _ := ioutil.ReadAll(res.Body)
 	if res.StatusCode != 404 {
-		Warning.Printf("Cannot connect to Syncthing, Status %d != 404 for POST\n", res.StatusCode, string(body))
+		Warning.Printf("Cannot connect to Syncthing, Status %d != 404 for GET\n", res.StatusCode, string(body))
 		return errors.New("Invalid HTTP status code")
 	}
 	return nil
@@ -500,8 +500,12 @@ func informError(msg string) error {
 		Warning.Println("Failed to inform Syncthing about", msg, err)
 		return err
 	}
+	if res.StatusCode == 403 {
+		Warning.Printf("Error: HTTP POST forbidden. Missing API key?")
+		return errors.New("HTTP POST forbidden")
+	}
 	if res.StatusCode != 200 {
-		Warning.Printf("Error: Status %d != 200 for POST.\n%v: %v %v", msg, res.StatusCode)
+		Warning.Printf("Error: Status %d != 200 for POST.\n%v", res.StatusCode, msg)
 		return errors.New("Invalid HTTP status code")
 	}
 	return err
@@ -525,8 +529,12 @@ func informChange(folder string, subs []string) error {
 		Warning.Println("Failed to perform request", err)
 		return err
 	}
+	if res.StatusCode == 403 {
+		Warning.Printf("Error: HTTP POST forbidden. missing API key?")
+		return errors.New("HTTP POST forbidden")
+	}
 	if res.StatusCode != 200 {
-		Warning.Printf("Error: Status %d != 200 for POST.\n%v: %v %v", folder, res.StatusCode)
+		Warning.Printf("Error: Status %d != 200 for POST.\n%v", res.StatusCode, folder)
 		return errors.New("Invalid HTTP status code")
 	} else {
 		OK.Printf("Syncthing is indexing change in %v: %v", folder, subs)
@@ -613,6 +621,8 @@ func accumulateChanges(interval time.Duration,
 					delete(inProgress, path)
 					Debug.Println("[INFORMED] Removed tracking for " + path)
 				}
+			} else {
+				time.Sleep(configSyncTimeout)
 			}
 		}
 	}
