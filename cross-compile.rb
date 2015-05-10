@@ -3,13 +3,12 @@
 # `/bin/bash -ic 'cd $(dirname $(dirname $(which go)))/src && ./make.bash'`
 
 oses = {
-  "darwin" => ["386", "amd64"],
+  "darwin" => ["amd64"],
   "dragonfly" => ["386", "amd64"],
   "freebsd" => ["386", "amd64", "arm"],
   "linux" => ["386", "amd64", "arm"],
   "netbsd" => ["386", "amd64"],
   "openbsd" => ["386", "amd64"],
-  "solaris" => ["amd64"],
   "windows" => ["386", "amd64"]}
 
 version = `git describe --abbrev=0 --tags`.chomp
@@ -29,8 +28,8 @@ version = `git describe --abbrev=0 --tags`.chomp
       vars = "GOOS=#{os} GOARCH=#{arch}"
       build = "#{vars} go build 2>&1"
       package = "tar -czf syncthing-inotify-#{os}-#{arch}-#{version}.tar.gz #{name}"
-      rename = "mv #{name} #{newname}"
-      output = `#{build} && #{package} && #{rename}`
+      remove = "rm #{name}"
+      output = `#{build} && #{package} && #{remove}`
       puts output unless output.empty?
       if output.include?("must be bootstrapped")
         `cd $(dirname $(which go))/../src && #{vars} ./make.bash --no-clean 1>&2`
