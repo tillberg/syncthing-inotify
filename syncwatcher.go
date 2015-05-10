@@ -119,6 +119,7 @@ var (
 	Debug        = Discard // 4
 	watchFolders folderSlice
 	skipFolders  folderSlice
+	delayScan    = true
 )
 
 const (
@@ -162,6 +163,7 @@ func init() {
 	flag.BoolVar(&authPassStdin, "password-stdin", false, "Provide password through stdin")
 	flag.Var(&watchFolders, "folders", "A comma-separated list of folders to watch (all by default)")
 	flag.Var(&skipFolders, "skip-folders", "A comma-separated list of folders to skip inotify watching")
+	flag.BoolVar(&delayScan, "delay-scan", true, "Automatically delay next scan interval")
 
 	flag.Usage = usageFor(flag.CommandLine, usage, fmt.Sprintf(extraUsage))
 	flag.Parse()
@@ -516,6 +518,9 @@ func informChange(folder string, subs []string) error {
 	data.Set("folder", folder)
 	for _, sub := range subs {
 		data.Add("sub", sub)
+	}
+	if delayScan {
+		data.Set("next", strconv.Itoa(86400))
 	}
 	Trace.Printf("Informing ST: %v: %v", folder, subs)
 	r, _ := http.NewRequest("POST", target+"/rest/db/scan?"+data.Encode(), nil)
