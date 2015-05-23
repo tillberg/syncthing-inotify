@@ -140,7 +140,7 @@ show time only (2).`
 )
 
 func init() {
-	c, _ := getSTConfig()
+	c, _ := getSTConfig(getSTDefaultConfDir())
 	if !strings.Contains(c.Target, "://") {
 		if c.TLS {
 			target = "https://" + c.Target
@@ -151,11 +151,13 @@ func init() {
 
 	var verbosity int
 	var logflags int
+	var home string
 	var apiKeyStdin bool
 	var authPassStdin bool
 	var showVersion bool
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
 	flag.IntVar(&logflags, "logflags", 2, "Select information in log line prefix")
+	flag.StringVar(&home, "home", home, "Specify the home Syncthing dir to sniff configuration settings")
 	flag.StringVar(&target, "target", target, "Target url (prepend with https:// for TLS)")
 	flag.StringVar(&authUser, "user", c.AuthUser, "Username")
 	flag.StringVar(&authPass, "password", "***", "Password")
@@ -187,6 +189,21 @@ func init() {
 	}
 	if verbosity >= 4 {
 		Debug = log.New(os.Stdout, "[DEBUG] ", logflags)
+	}
+
+	if len(home) > 0 {
+		c, err := getSTConfig(home)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if !strings.Contains(c.Target, "://") {
+			if c.TLS {
+				target = "https://" + c.Target
+			} else {
+				target = "http://" + c.Target
+			}
+			apiKey = c.ApiKey
+		}
 	}
 	if !strings.Contains(target, "://") {
 		target = "http://" + target
@@ -918,8 +935,8 @@ func usageFor(fs *flag.FlagSet, usage string, extra string) func() {
 	}
 }
 
-func getSTConfig() (STConfig, error) {
-	var path = filepath.Join(getSTDefaultConfDir(), "config.xml")
+func getSTConfig(dir string) (STConfig, error) {
+	var path = filepath.Join(dir, "config.xml")
 	nc := STNestedConfig{Config: STConfig{Target: "localhost:8384"}}
 	if file, err := os.Open(path); err != nil {
 		return nc.Config, err
