@@ -279,7 +279,7 @@ func restart() bool {
 		return false
 	}
 	proc.Release()
-	stop <- 0
+	stop <- 3
 	return true
 }
 
