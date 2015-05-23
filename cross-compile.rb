@@ -26,6 +26,12 @@ version = `git describe --abbrev=0 --tags`.chomp
         name = name + ".exe"
       end
       vars = "GOOS=#{os} GOARCH=#{arch}"
+      if arch.include?("386")
+        vars += " GO386=387"
+      end
+      if arch.include?("arm")
+        vars += " GOARM=5"
+      end
       build = "#{vars} go build 2>&1"
       package = "tar -czf syncthing-inotify-#{os}-#{arch}-#{version}.tar.gz #{name}"
       remove = "rm #{name}"
