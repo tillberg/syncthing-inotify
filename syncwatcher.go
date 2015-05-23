@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/rjeczalik/notify"
+	"github.com/zillode/notify"
 )
 
 type Configuration struct {
