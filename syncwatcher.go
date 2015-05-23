@@ -112,6 +112,7 @@ var (
 var (
 	stop         = make(chan int)
 	ignorePaths  = []string{".stversions", ".stfolder", ".stignore", ".syncthing"}
+	Version      = "unknown-dev"
 	Discard      = log.New(ioutil.Discard, "", log.Ldate)
 	Warning      = Discard // 1
 	OK           = Discard
@@ -152,6 +153,7 @@ func init() {
 	var logflags int
 	var apiKeyStdin bool
 	var authPassStdin bool
+	var showVersion bool
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
 	flag.IntVar(&logflags, "logflags", 2, "Select information in log line prefix")
 	flag.StringVar(&target, "target", target, "Target url (prepend with https:// for TLS)")
@@ -164,9 +166,15 @@ func init() {
 	flag.Var(&watchFolders, "folders", "A comma-separated list of folders to watch (all by default)")
 	flag.Var(&skipFolders, "skip-folders", "A comma-separated list of folders to skip inotify watching")
 	flag.BoolVar(&delayScan, "delay-scan", true, "Automatically delay next scan interval")
+	flag.BoolVar(&showVersion, "version", false, "Show version")
 
 	flag.Usage = usageFor(flag.CommandLine, usage, fmt.Sprintf(extraUsage))
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("syncthing-inotify %s (%s %s-%s)\n", Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+		os.Exit(0)
+	}
 
 	if verbosity >= 1 {
 		Warning = log.New(os.Stdout, "[WARNING] ", logflags)

@@ -32,7 +32,8 @@ version = `git describe --abbrev=0 --tags`.chomp
       if arch.include?("arm")
         vars += " GOARM=5"
       end
-      build = "#{vars} go build 2>&1"
+      ldflags = "-w -X main.Version #{version}"
+      build = "#{vars} go build -ldflags '#{ldflags}'"
       package = "tar -czf syncthing-inotify-#{os}-#{arch}-#{version}.tar.gz #{name}"
       remove = "rm #{name}"
       output = `#{build} && #{package} && #{remove}`

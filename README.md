@@ -34,6 +34,12 @@ export GOPATH=$(pwd)
 cd src/github.com/syncthing/syncthing-inotify
 go get
 go build
+# To tag the build with a version number, use
+go build -ldflags "-w -X main.Version `git describe --abbrev=0 --tags`"
+# See cross-compile.rb for further compilation details
+# - Please prefix the build with GO386=387 when building for i386
+# - Please prefix the build with GOARM=5 when building for arm
+# - Depends on darwin_amd64/notify.a for OSX builds
 ```
 
 
@@ -41,5 +47,5 @@ go build
 * Linux limits the amount of inotify watchers (typically to [8192](http://stackoverflow.com/a/20355253)). Therefore, if you wish to sync many files and folders, you'll need to increase the upper limit:
 
   Permanently fix `Too many open files` for Linux: ```sudo sh -c 'echo fs.inotify.max_user_watches=204800\n >> /etc/sysctl.conf'```
-  
+
   Fix `Too many open files` for Linux until next reboot: ```sudo sh -c 'echo fs.inotify.max_user_watches=204800\n >> /etc/sysctl.conf'``` (should be applied before launching syncthing-inotify)
