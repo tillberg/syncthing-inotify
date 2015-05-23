@@ -874,9 +874,6 @@ func getHomeDir() string {
 	default:
 		home = os.Getenv("HOME")
 	}
-	if home == "" {
-		log.Fatalln("No home path found - set $HOME (or the platform equivalent).")
-	}
 	return home
 }
 
