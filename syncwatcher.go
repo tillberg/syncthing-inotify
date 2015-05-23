@@ -319,7 +319,7 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 func getIgnorePatterns(folder string) []Pattern {
 	for {
 		Trace.Println("Getting ignore patterns for " + folder)
-		r, err := http.NewRequest("GET", target+"/rest/db/ignores?folder="+folder, nil)
+		r, err := http.NewRequest("GET", target+"/rest/db/ignores?folder="+url.QueryEscape(folder), nil)
 		res, err := performRequest(r)
 		defer func() {
 			if res != nil && res.Body != nil {
@@ -327,7 +327,7 @@ func getIgnorePatterns(folder string) []Pattern {
 			}
 		}()
 		if err != nil {
-			Warning.Println("Failed to perform request /rest/db/ignores: ", err)
+			Warning.Println("Failed to perform request /rest/db/ignores?folder="+url.QueryEscape(folder), err)
 			time.Sleep(configSyncTimeout)
 			continue
 		}
@@ -337,7 +337,7 @@ func getIgnorePatterns(folder string) []Pattern {
 			continue
 		}
 		if res.StatusCode != 200 {
-			log.Fatalf("Status %d != 200 for GET /rest/db/ignores: ", res.StatusCode, res)
+			log.Fatalf("Status %d != 200 for GET /rest/db/ignores?folder=%s: %v\n", res.StatusCode, folder, res)
 		}
 		bs, err := ioutil.ReadAll(res.Body)
 		if err != nil {
