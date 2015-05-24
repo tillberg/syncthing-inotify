@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 # If you get the error "go build runtime: <runtime> must be bootstrapped using make.bash", please run:
-# `/bin/bash -ic 'cd $(dirname $(dirname $(which go)))/src && ./make.bash'`
+# `/bin/bash -ic 'cd $(dirname $(dirname $(which go)))/src && GO386=387 GOARM=5 ./make.bash'`
 
 oses = {
   "darwin" => ["amd64"],
@@ -36,9 +36,9 @@ version = `git describe --abbrev=0 --tags`.chomp
       build = "#{vars} go build -ldflags '#{ldflags}'"
       package = "tar -czf syncthing-inotify-#{os}-#{arch}-#{version}.tar.gz #{name}"
       remove = "rm #{name}"
-      output = `#{build} && #{package} && #{remove}`
+      output = `#{build} 2>&1 && #{package} && #{remove}`
       puts output unless output.empty?
-      if output.include?("must be bootstrapped")
+      if output.include?("must be bootstrapped") || output.include?("no such tool")
         `cd $(dirname $(which go))/../src && #{vars} ./make.bash --no-clean 1>&2`
         bootstrapped = true
       end
