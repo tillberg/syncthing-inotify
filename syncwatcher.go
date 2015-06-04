@@ -407,7 +407,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	defer notify.Stop(c)
 	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
 	OK.Println("Watching " + folder.ID + ": " + folderPath)
-	if folder.RescanIntervalS < 1800 {
+	if folder.RescanIntervalS < 1800 && delayScan <= 0 {
 		OK.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
 	}
 	for {
