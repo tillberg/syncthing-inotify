@@ -74,6 +74,11 @@ type STConfig struct {
 
 type folderSlice []string
 
+type progressTime struct {
+	fsEvent bool
+	time    time.Time
+}
+
 func (fs *folderSlice) String() string {
 	return fmt.Sprint(*fs)
 }
@@ -104,6 +109,7 @@ var (
 	debounceTimeout    = 500 * time.Millisecond
 	remoteIndexTimeout = 600 * time.Millisecond
 	configSyncTimeout  = 5 * time.Second
+	fsEventTimeout     = 5 * time.Second
 	dirVsFiles         = 256
 	maxFiles           = 5000
 )
@@ -578,7 +584,7 @@ func accumulateChanges(interval time.Duration,
 	folder string, folderPath string, dirVsFiles int,
 	stInput chan STEvent, fsInput chan string,
 	callback func(folder string, subs []string) error) func(string) {
-	inProgress := make(map[string]bool) // [Path string, InProgress bool]
+	inProgress := make(map[string]progressTime) // [path string, start+fs pair]
 	currInterval := interval
 	for {
 		select {
@@ -600,10 +606,10 @@ func accumulateChanges(interval time.Duration,
 				continue
 			}
 			Debug.Println("[ST] Incoming: " + item.Path)
-			inProgress[item.Path] = true
+			inProgress[item.Path] = progressTime{false, time.Now()}
 		case item := <-fsInput:
 			p, ok := inProgress[item]
-			if p && ok {
+			if ok && !p.fsEvent {
 				// Change originated from ST
 				delete(inProgress, item)
 				Debug.Println("[FS] Removed tracking for " + item)
@@ -614,7 +620,7 @@ func accumulateChanges(interval time.Duration,
 				continue
 			}
 			Debug.Println("[FS] Tracking: " + item)
-			inProgress[item] = false
+			inProgress[item] = progressTime{true, time.Now()}
 		case <-time.After(currInterval):
 			currInterval = interval
 			if len(inProgress) == 0 {
@@ -623,12 +629,15 @@ func accumulateChanges(interval time.Duration,
 			Debug.Println("Timeout AccumulateChanges")
 			var err error
 			var paths []string
+			expiry := time.Now().Add(-fsEventTimeout)
 			if len(inProgress) < maxFiles {
 				for path, progress := range inProgress {
-					if path == "" {
+					// Clean up invalid and expired paths
+					if path == "" || progress.time.Before(expiry) {
+						delete(inProgress, path)
 						continue
 					}
-					if !progress {
+					if progress.fsEvent {
 						paths = append(paths, path)
 						Debug.Println("Informing about " + path)
 					} else {
