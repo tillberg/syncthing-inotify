@@ -625,9 +625,11 @@ func accumulateChanges(debounceTimeout, stRescanInterval time.Duration,
 			inProgress[item] = progressTime{true, time.Now()}
 		case <-time.After(currInterval):
 			if len(inProgress) == 0 {
-				currInterval = delayScanInterval
-				Debug.Println("Slowing down inotify timeout parameters for " + folder)
-				// TODO trigger nextScan
+				if currInterval != delayScanInterval {
+					Debug.Println("Slowing down inotify timeout parameters for " + folder)
+					currInterval = delayScanInterval
+				}
+				callback(folder, []string{".stfolder"}) // Periodically extend the nextScan interval
 				continue
 			}
 			Debug.Println("Timeout AccumulateChanges")

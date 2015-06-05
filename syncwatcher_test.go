@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	slash         = string(os.PathSeparator)
-	testDirectory = "test" + slash
+	slash                     = string(os.PathSeparator)
+	testDirectory             = "test" + slash
+	testFolderRescanIntervalS = 60 * time.Second
 )
 
 func clearTestDir() {
@@ -66,13 +67,16 @@ func TestDebouncedFileWatch(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != testFile {
-			t.Error("Invalid result for file change: " + repo + " " + sub[0])
+			t.Error("Invalid result for file change: "+repo, sub)
 		}
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -92,13 +96,16 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != testFile {
-			t.Error("Invalid result for directory change: " + repo + " " + sub[0])
+			t.Error("Invalid result for directory change: "+repo, sub)
 		}
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	fsChan <- testDirectory + slash + testFile
 	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
@@ -121,13 +128,16 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != "a" {
-			t.Error("Invalid result for directory change: " + repo + " " + sub[0])
+			t.Error("Invalid result for directory change: "+repo, sub)
 		}
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -155,16 +165,19 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 2 || sub[0] != "a" {
-			t.Error("Invalid result for directory change 1: " + repo + " " + sub[0])
+			t.Error("Invalid result for directory change 1: "+repo, sub)
 		}
 		if repo != testRepo || sub[1] != "b" {
-			t.Error("Invalid result for directory change 2: " + repo + " " + sub[1])
+			t.Error("Invalid result for directory change 2: "+repo, sub)
 		}
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -188,6 +201,9 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		for i, s := range sub {
 			if repo != testRepo || s != testFiles[i] {
 				t.Error("Invalid result for directory change " + strconv.Itoa(testOK) + ": " + repo + " " + s)
@@ -196,7 +212,7 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -223,16 +239,19 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 2 || sub[0] != "a"+slash+"b" {
-			t.Error("Invalid result for directory change " + strconv.Itoa(testOK) + ": " + repo + " " + sub[0])
+			t.Error("Invalid result for directory change "+strconv.Itoa(testOK)+": "+repo, sub)
 		}
 		if repo != testRepo || sub[1] != "a"+slash+"e" {
-			t.Error("Invalid result for directory change " + strconv.Itoa(testOK) + ": " + repo + " " + sub[1])
+			t.Error("Invalid result for directory change "+strconv.Itoa(testOK)+": "+repo, sub)
 		}
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -258,13 +277,16 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != "" {
-			t.Error("Invalid result for directory change: "+repo, sub[0])
+			t.Error("Invalid result for directory change: "+repo, sub)
 		}
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -290,13 +312,16 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != strings.TrimSuffix(testChangeDir, slash) {
-			t.Error("Invalid result for directory change: " + repo + " " + sub[0])
+			t.Error("Invalid result for directory change: "+repo, sub)
 		}
 		testOK += 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -320,13 +345,16 @@ func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != "a" {
-			t.Error("Invalid result for directory change: " + repo + " " + sub[0])
+			t.Error("Invalid result for directory change: "+repo, sub)
 		}
 		testOK += 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -350,13 +378,16 @@ func TestSTEvents(t *testing.T) {
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
 	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
 		if repo != testRepo || len(sub) != 0 {
 			t.Error("Invalid result for directory change: " + repo)
 		}
 		testOK = false
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	stChan <- STEvent{Path: ""}
 	for i := range testFiles {
 		stChan <- STEvent{Path: testDirectory + slash + testFiles[i], Finished: false}
