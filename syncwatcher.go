@@ -400,7 +400,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	c := make(chan notify.EventInfo, maxFiles)
 	if err := notify.Watch(filepath.Join(folderPath, "..."), c, notify.All); err != nil {
 		Warning.Println("Failed to install inotify handlers", err)
-		informError("Failed to install inotify handler for " + folder.ID)
+		informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
 		return
 	}
 	defer notify.Stop(c)
@@ -665,6 +665,7 @@ func accumulateChanges(debounceTimeout, stRescanInterval time.Duration,
 					Debug.Println("[INFORMED] Removed tracking for " + path)
 				}
 			} else {
+				Warning.Println("Syncthing failed to index changes for ", folder, err)
 				time.Sleep(configSyncTimeout)
 			}
 		}
