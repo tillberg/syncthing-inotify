@@ -106,12 +106,11 @@ var (
 
 // HTTP Debounce
 var (
-	debounceTimeout    = 500 * time.Millisecond
-	remoteIndexTimeout = 600 * time.Millisecond
-	configSyncTimeout  = 5 * time.Second
-	fsEventTimeout     = 5 * time.Second
-	dirVsFiles         = 256
-	maxFiles           = 5000
+	debounceTimeout   = 500 * time.Millisecond
+	configSyncTimeout = 5 * time.Second
+	fsEventTimeout    = 5 * time.Second
+	dirVsFiles        = 256
+	maxFiles          = 5000
 )
 
 // Main
@@ -405,7 +404,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 		return
 	}
 	defer notify.Stop(c)
-	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
+	go accumulateChanges(debounceTimeout, time.Duration(folder.RescanIntervalS)*time.Second, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
 	OK.Println("Watching " + folder.ID + ": " + folderPath)
 	if folder.RescanIntervalS < 1800 && delayScan <= 0 {
 		OK.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
@@ -580,19 +579,20 @@ func informChange(folder string, subs []string) error {
 	return err
 }
 
-func accumulateChanges(interval time.Duration,
+func accumulateChanges(debounceTimeout, stRescanInterval time.Duration,
 	folder string, folderPath string, dirVsFiles int,
 	stInput chan STEvent, fsInput chan string,
 	callback func(folder string, subs []string) error) func(string) {
-	inProgress := make(map[string]progressTime) // [path string, start+fs pair]
-	currInterval := interval
+	inProgress := make(map[string]progressTime)               // [path string, start+fs pair]
+	delayScanInterval := stRescanInterval - (5 * time.Second) // Invoke delayScan before rescan is triggered
+	currInterval := delayScanInterval                         // Timeout of the timer
 	for {
 		select {
 		case item := <-stInput:
 			if item.Path == "" {
 				// Prepare for incoming changes
-				currInterval = remoteIndexTimeout
-				Debug.Println("[ST] Incoming Changes for " + folder + ", increasing inotify timeout parameters")
+				currInterval = debounceTimeout
+				Debug.Println("[ST] Incoming Changes for " + folder + ", speeding up inotify timeout parameters")
 				continue
 			}
 			if item.Finished {
@@ -608,6 +608,8 @@ func accumulateChanges(interval time.Duration,
 			Debug.Println("[ST] Incoming: " + item.Path)
 			inProgress[item.Path] = progressTime{false, time.Now()}
 		case item := <-fsInput:
+			currInterval = debounceTimeout
+			Debug.Println("[FS] Incoming Changes for " + folder + ", speeding up inotify timeout parameters")
 			p, ok := inProgress[item]
 			if ok && !p.fsEvent {
 				// Change originated from ST
@@ -622,14 +624,16 @@ func accumulateChanges(interval time.Duration,
 			Debug.Println("[FS] Tracking: " + item)
 			inProgress[item] = progressTime{true, time.Now()}
 		case <-time.After(currInterval):
-			currInterval = interval
 			if len(inProgress) == 0 {
+				currInterval = delayScanInterval
+				Debug.Println("Slowing down inotify timeout parameters for " + folder)
+				// TODO trigger nextScan
 				continue
 			}
 			Debug.Println("Timeout AccumulateChanges")
 			var err error
 			var paths []string
-			expiry := time.Now().Add(-fsEventTimeout)
+			expiry := time.Now().Add(-debounceTimeout * 10)
 			if len(inProgress) < maxFiles {
 				for path, progress := range inProgress {
 					// Clean up invalid and expired paths
