@@ -116,7 +116,7 @@ var (
 // Main
 var (
 	stop         = make(chan int)
-	ignorePaths  = []string{".stversions", ".stfolder", ".stignore", ".syncthing"}
+	ignorePaths  = []string{".stversions", ".stfolder", ".stignore", ".syncthing", "~syncthing~"}
 	Version      = "unknown-dev"
 	Discard      = log.New(ioutil.Discard, "", log.Ldate)
 	Warning      = Discard // 1
