@@ -172,7 +172,7 @@ func init() {
 	flag.BoolVar(&authPassStdin, "password-stdin", false, "Provide password through stdin")
 	flag.Var(&watchFolders, "folders", "A comma-separated list of folders to watch (all by default)")
 	flag.Var(&skipFolders, "skip-folders", "A comma-separated list of folders to skip inotify watching")
-	flag.IntVar(&delayScan, "delay-scan", delayScan, "Automatically delay next scan interval (in ms)")
+	flag.IntVar(&delayScan, "delay-scan", delayScan, "Automatically delay next scan interval (in seconds)")
 	flag.BoolVar(&showVersion, "version", false, "Show version")
 
 	flag.Usage = usageFor(flag.CommandLine, usage, fmt.Sprintf(extraUsage))
@@ -237,6 +237,9 @@ func init() {
 	}
 	if len(watchFolders) != 0 && len(skipFolders) != 0 {
 		log.Fatalln("Either provide a list of folders to be watched or to be ignored, not both.")
+	}
+	if delayScan > 0 && delayScan < 60 {
+		log.Fatalln("A delay scan interval shorter than 60 is not supported.")
 	}
 }
 
@@ -404,7 +407,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 		return
 	}
 	defer notify.Stop(c)
-	go accumulateChanges(debounceTimeout, time.Duration(folder.RescanIntervalS)*time.Second, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
+	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
 	OK.Println("Watching " + folder.ID + ": " + folderPath)
 	if folder.RescanIntervalS < 1800 && delayScan <= 0 {
 		OK.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
@@ -488,6 +491,7 @@ func performRequest(r *http.Request) (*http.Response, error) {
 	tr := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		ResponseHeaderTimeout: requestTimeout,
+		DisableKeepAlives:     true,
 	}
 	client := &http.Client{
 		Transport: tr,
@@ -579,13 +583,16 @@ func informChange(folder string, subs []string) error {
 	return err
 }
 
-func accumulateChanges(debounceTimeout, stRescanInterval time.Duration,
+func accumulateChanges(debounceTimeout time.Duration,
 	folder string, folderPath string, dirVsFiles int,
 	stInput chan STEvent, fsInput chan string,
 	callback func(folder string, subs []string) error) func(string) {
-	inProgress := make(map[string]progressTime)               // [path string, start+fs pair]
-	delayScanInterval := stRescanInterval - (5 * time.Second) // Invoke delayScan before rescan is triggered
-	currInterval := delayScanInterval                         // Timeout of the timer
+	delayScanInterval := time.Duration(delayScan-5) * time.Second
+	Debug.Printf("Delay scan reminder interval for %s set to %.0f seconds\n", folder, delayScanInterval.Seconds())
+	inProgress := make(map[string]progressTime)       // [path string, start+fs pair]
+	currInterval := delayScanInterval                 // Timeout of the timer
+	callback(folder, []string{".stfolder"})           // Inform Syncthing to delay scan interval
+	nextScanTime := time.Now().Add(delayScanInterval) // Time to remind Syncthing to delay scan
 	for {
 		select {
 		case item := <-stInput:
@@ -624,12 +631,16 @@ func accumulateChanges(debounceTimeout, stRescanInterval time.Duration,
 			Debug.Println("[FS] Tracking: " + item)
 			inProgress[item] = progressTime{true, time.Now()}
 		case <-time.After(currInterval):
+			if delayScan > 0 && nextScanTime.Before(time.Now()) {
+				nextScanTime = time.Now().Add(delayScanInterval)
+				Debug.Println("Periodically extend the nextScan interval for " + folder)
+				callback(folder, []string{".stfolder"})
+			}
 			if len(inProgress) == 0 {
 				if currInterval != delayScanInterval {
 					Debug.Println("Slowing down inotify timeout parameters for " + folder)
 					currInterval = delayScanInterval
 				}
-				callback(folder, []string{".stfolder"}) // Periodically extend the nextScan interval
 				continue
 			}
 			Debug.Println("Timeout AccumulateChanges")
@@ -666,6 +677,7 @@ func accumulateChanges(debounceTimeout, stRescanInterval time.Duration,
 					delete(inProgress, path)
 					Debug.Println("[INFORMED] Removed tracking for " + path)
 				}
+				nextScanTime = time.Now().Add(delayScanInterval) // Scan was delayed
 			} else {
 				Warning.Println("Syncthing failed to index changes for ", folder, err)
 				time.Sleep(configSyncTimeout)

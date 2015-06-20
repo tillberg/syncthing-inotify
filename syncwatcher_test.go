@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	slash                     = string(os.PathSeparator)
-	testDirectory             = "test" + slash
-	testFolderRescanIntervalS = 60 * time.Second
+	slash         = string(os.PathSeparator)
+	testDirectory = "test" + slash
 )
 
 func clearTestDir() {
@@ -76,7 +75,7 @@ func TestDebouncedFileWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -105,7 +104,7 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	fsChan <- testDirectory + slash + testFile
 	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
@@ -137,7 +136,7 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -177,7 +176,7 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -212,7 +211,7 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -251,7 +250,7 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -286,7 +285,7 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -321,7 +320,7 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 		testOK += 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -354,7 +353,7 @@ func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
 		testOK += 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + slash + testFiles[i]
 	}
@@ -387,7 +386,7 @@ func TestSTEvents(t *testing.T) {
 		testOK = false
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testFolderRescanIntervalS, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	stChan <- STEvent{Path: ""}
 	for i := range testFiles {
 		stChan <- STEvent{Path: testDirectory + slash + testFiles[i], Finished: false}
