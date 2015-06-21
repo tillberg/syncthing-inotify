@@ -125,7 +125,7 @@ var (
 	Debug        = Discard // 4
 	watchFolders folderSlice
 	skipFolders  folderSlice
-	delayScan    = 86400
+	delayScan    = 3600
 )
 
 const (
