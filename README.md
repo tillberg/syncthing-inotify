@@ -48,4 +48,4 @@ go build -ldflags "-w -X main.Version `git describe --abbrev=0 --tags`"
 
   Permanently fix `Too many open files` for Linux: ```sudo sh -c 'echo fs.inotify.max_user_watches=204800\n >> /etc/sysctl.conf'```
 
-  Fix `Too many open files` for Linux until next reboot: ```sudo sh -c 'echo fs.inotify.max_user_watches=204800\n >> /etc/sysctl.conf'``` (should be applied before launching syncthing-inotify)
+  Fix `Too many open files` for Linux until next reboot: ```sudo sh -c 'echo 204800 > /proc/sys/fs/inotify/max_user_watches'``` (should be applied before launching syncthing-inotify)
