@@ -109,8 +109,8 @@ var (
 	debounceTimeout   = 500 * time.Millisecond
 	configSyncTimeout = 5 * time.Second
 	fsEventTimeout    = 5 * time.Second
-	dirVsFiles        = 256
-	maxFiles          = 5000
+	dirVsFiles        = 128
+	maxFiles          = 512
 )
 
 // Main
@@ -541,7 +541,7 @@ func informError(msg string) error {
 		return errors.New("HTTP POST forbidden")
 	}
 	if res.StatusCode != 200 {
-		Warning.Printf("Error: Status %d != 200 for POST.\n%v", res.StatusCode, msg)
+		Warning.Printf("Error: Status %d != 200 for POST: %v\n", res.StatusCode, msg)
 		return errors.New("Invalid HTTP status code")
 	}
 	return err
@@ -573,7 +573,9 @@ func informChange(folder string, subs []string) error {
 		return errors.New("HTTP POST forbidden")
 	}
 	if res.StatusCode != 200 {
-		Warning.Printf("Error: Status %d != 200 for POST.\n%v", res.StatusCode, folder)
+		msg, _ := ioutil.ReadAll(res.Body)
+		Warning.Println(target + "/rest/db/scan?" + data.Encode())
+		Warning.Printf("Error: Status %d != 200 for POST: %v, %s\n", res.StatusCode, folder, msg)
 		return errors.New("Invalid HTTP status code")
 	} else {
 		OK.Printf("Syncthing is indexing change in %v: %v", folder, subs)
