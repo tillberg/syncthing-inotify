@@ -129,8 +129,9 @@ var (
 )
 
 const (
-	usage      = "syncthing-inotify [options]"
-	extraUsage = `
+	pathSeparator = string(os.PathSeparator)
+	usage         = "syncthing-inotify [options]"
+	extraUsage    = `
 The -logflags value is a sum of the following:
 
    1  Date
@@ -678,7 +679,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 				}
 			} else {
 				// Do not track more than maxFiles changes, inform syncthing to rescan entire folder
-				err = aggregateChanges(folder, folderPath, dirVsFiles, callback, []string{folderPath})
+				err = callback(folder, []string{""})
 				if err == nil {
 					for path, progress := range inProgress {
 						if progress.fsEvent {
@@ -706,26 +707,36 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	if len(paths) == 0 {
 		return errors.New("No changes to aggregate")
 	}
-	trackedPaths := make(map[string]int) // Map directories to scores; if score == -1 the path is a filename
+	trackedPaths := make(map[string]int) // Map paths to scores; if score == -1 the path is a filename
+	trackedDirs := make(map[string]bool) // Map of directories
 	sort.Strings(paths)                  // Make sure parent paths are processed first
 	previousPath := ""                   // Filter duplicates
 	for i := range paths {
 		path := filepath.Clean(paths[i])
+		if path == "." {
+			path = ""
+		}
 		if path == previousPath {
 			continue
 		}
 		previousPath = path
 		fi, _ := os.Stat(path)
 		path = strings.TrimPrefix(path, folderPath)
-		path = strings.TrimPrefix(path, string(os.PathSeparator))
+		path = strings.TrimPrefix(path, pathSeparator)
 		var dir string
-		if fi == nil || fi.IsDir() {
-			// Definitely inform if:
-			// - If the path does not exist anymore
-			// - It is a directory
+		if fi == nil {
+			// Definitely inform if the path does not exist anymore
 			dir = path
 			trackedPaths[path] = dirVsFiles
+			Debug.Println("[AG] Not found:", path)
+		} else if fi.IsDir() {
+			// Definitely inform if a directory changed
+			dir = path
+			trackedPaths[path] = dirVsFiles
+			trackedDirs[dir] = true
+			Debug.Println("[AG] Is a dir:", dir)
 		} else {
+			Debug.Println("[AG] Is file:", path)
 			// Files are linked to -1 scores
 			// Also increment the parent path with 1
 			dir = filepath.Dir(path)
@@ -734,12 +745,14 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 			}
 			trackedPaths[path] = -1
 			trackedPaths[dir] += 1
+			trackedDirs[dir] = true
 		}
 		// Search for existing parent directory relations in the map
 		for trackedPath, _ := range trackedPaths {
-			if strings.HasPrefix(dir, trackedPath) {
-				// Increment score of tracked current/parent directory
+			if trackedDirs[trackedPath] && strings.HasPrefix(dir, trackedPath+pathSeparator) {
+				// Increment score of tracked parent directory
 				trackedPaths[trackedPath] += 1 // for each file
+				Debug.Println("[AG] Increment:", trackedPath, trackedPaths, trackedPaths[trackedPath])
 			}
 		}
 	}
@@ -748,20 +761,26 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 		keys = append(keys, k)
 	}
 	sort.Strings(keys) // Sort directories before their own files
-	previousDone, previousPath := false, ""
+	previousPath = ""
 	var scans []string
 	for i := range keys {
 		trackedPath := keys[i]
 		trackedPathScore, _ := trackedPaths[trackedPath]
-		if previousDone && strings.HasPrefix(trackedPath, previousPath) {
+		if strings.HasPrefix(trackedPath, previousPath+pathSeparator) {
+			// Already informed parent directory change
 			continue
-		} // Already informed parent directory change
+		}
 		if trackedPathScore < dirVsFiles && trackedPathScore != -1 {
+			// Not enough files for this directory or it is a file
 			continue
-		} // Not enough files for this directory or it is a file
-		previousDone = trackedPathScore != -1
+		}
 		previousPath = trackedPath
+		Debug.Println("[AG] Appending path:", trackedPath, previousPath)
 		scans = append(scans, trackedPath)
+		if trackedPath == "" {
+			// If we need to scan everything, skip the rest
+			break
+		}
 	}
 	return callback(folder, scans)
 }
@@ -923,7 +942,7 @@ func expandTilde(p string) string {
 		return getHomeDir()
 	}
 	p = filepath.FromSlash(p)
-	if !strings.HasPrefix(p, fmt.Sprintf("~%c", os.PathSeparator)) {
+	if !strings.HasPrefix(p, fmt.Sprintf("~%c", pathSeparator)) {
 		return p
 	}
 	return filepath.Join(getHomeDir(), p[2:])
