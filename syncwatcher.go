@@ -670,15 +670,26 @@ func accumulateChanges(debounceTimeout time.Duration,
 
 				// Try to inform changes to syncthing and if succeeded, clean up
 				err = aggregateChanges(folder, folderPath, dirVsFiles, callback, paths)
+				if err == nil {
+					for _, path := range paths {
+						delete(inProgress, path)
+						Debug.Println("[INFORMED] Removed tracking for " + path)
+					}
+				}
 			} else {
 				// Do not track more than maxFiles changes, inform syncthing to rescan entire folder
 				err = aggregateChanges(folder, folderPath, dirVsFiles, callback, []string{folderPath})
-			}
-			if err == nil {
-				for _, path := range paths {
-					delete(inProgress, path)
-					Debug.Println("[INFORMED] Removed tracking for " + path)
+				if err == nil {
+					for path, progress := range inProgress {
+						if progress.fsEvent {
+							delete(inProgress, path)
+							Debug.Println("[INFORMED] Removed tracking for " + path)
+						}
+					}
 				}
+			}
+
+			if err == nil {
 				nextScanTime = time.Now().Add(delayScanInterval) // Scan was delayed
 			} else {
 				Warning.Println("Syncthing failed to index changes for ", folder, err)
