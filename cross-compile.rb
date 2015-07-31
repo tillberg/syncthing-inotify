@@ -32,7 +32,7 @@ version = `git describe --abbrev=0 --tags`.chomp
       if arch.include?("arm")
         vars += " GOARM=5"
       end
-      ldflags = "-w -X main.Version #{version} -llibs/darwin_amd64/notify.a"
+      ldflags = "-w -X main.Version #{version}"
       build = "#{vars} go build -ldflags '#{ldflags}'"
       package = "tar -czf syncthing-inotify-#{os}-#{arch}-#{version}.tar.gz #{name}"
       remove = "rm #{name}"
