@@ -942,7 +942,7 @@ func expandTilde(p string) string {
 		return getHomeDir()
 	}
 	p = filepath.FromSlash(p)
-	if !strings.HasPrefix(p, fmt.Sprintf("~%c", pathSeparator)) {
+	if !strings.HasPrefix(p, fmt.Sprintf("~%c", os.PathSeparator)) {
 		return p
 	}
 	return filepath.Join(getHomeDir(), p[2:])
