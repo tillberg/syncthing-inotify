@@ -12,6 +12,12 @@ oses = {
   "windows" => ["386", "amd64"]}
 
 version = `git describe --abbrev=0 --tags`.chomp
+diff = `git diff`.chomp
+
+if diff
+  puts "Forgot to git reset --hard?"
+  exit if gets.chomp != "n"
+end
 
 2.times do
   bootstrapped = false
