@@ -318,7 +318,6 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 			}
 			if keep {
 				fs = append(fs, f)
-				break
 			}
 		}
 		return fs
