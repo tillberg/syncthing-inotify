@@ -65,7 +65,7 @@ type STNestedConfig struct {
 
 type STConfig struct {
 	CsrfFile string
-	ApiKey   string `xml:"apikey"`
+	APIKey   string `xml:"apikey"`
 	Target   string `xml:"address"`
 	AuthUser string `xml:"user"`
 	AuthPass string `xml:"password"`
@@ -168,7 +168,7 @@ func init() {
 	flag.StringVar(&authUser, "user", c.AuthUser, "Username")
 	flag.StringVar(&authPass, "password", "***", "Password")
 	flag.StringVar(&csrfFile, "csrf", "", "CSRF token file")
-	flag.StringVar(&apiKey, "api", c.ApiKey, "API key")
+	flag.StringVar(&apiKey, "api", c.APIKey, "API key")
 	flag.BoolVar(&apiKeyStdin, "api-stdin", false, "Provide API key through stdin")
 	flag.BoolVar(&authPassStdin, "password-stdin", false, "Provide password through stdin")
 	flag.Var(&watchFolders, "folders", "A comma-separated list of folders to watch (all by default)")
@@ -208,7 +208,7 @@ func init() {
 			} else {
 				target = "http://" + c.Target
 			}
-			apiKey = c.ApiKey
+			apiKey = c.APIKey
 		}
 	}
 	if !strings.Contains(target, "://") {
@@ -260,7 +260,8 @@ func main() {
 		stChans[folder.ID] = stChan
 		go watchFolder(folder, stChan)
 	}
-	go watchSTEvents(stChans, allFolders) // Note: Lose thread ownership of stChans
+	// Note: Lose thread ownership of stChans
+	go watchSTEvents(stChans, allFolders)
 
 	code := <-stop
 	OK.Println("Exiting")
@@ -317,7 +318,6 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 			}
 			if keep {
 				fs = append(fs, f)
-				break
 			}
 		}
 		return fs
@@ -444,7 +444,6 @@ func waitForEvent(c chan notify.EventInfo) string {
 		}
 		return ev.Path()
 	}
-	return ""
 }
 
 func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) bool {
@@ -517,7 +516,7 @@ func testWebGuiPost() error {
 	}
 	body, _ := ioutil.ReadAll(res.Body)
 	if res.StatusCode != 404 {
-		Warning.Printf("Cannot connect to Syncthing, Status %d != 404 for GET\n", res.StatusCode, string(body))
+		Warning.Printf("Cannot connect to Syncthing, Status %d != 404 for GET. Body: %v\n", res.StatusCode, string(body))
 		return errors.New("Invalid HTTP status code")
 	}
 	return nil
@@ -578,9 +577,9 @@ func informChange(folder string, subs []string) error {
 		Warning.Println(target + "/rest/db/scan?" + data.Encode())
 		Warning.Printf("Error: Status %d != 200 for POST: %v, %s\n", res.StatusCode, folder, msg)
 		return errors.New("Invalid HTTP status code")
-	} else {
-		OK.Printf("Syncthing is indexing change in %v: %v", folder, subs)
 	}
+	OK.Printf("Syncthing is indexing change in %v: %v", folder, subs)
+
 	// Wait until scan finishes
 	_, err = ioutil.ReadAll(res.Body)
 	return err
@@ -744,14 +743,14 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 				dir = ""
 			}
 			trackedPaths[path] = -1
-			trackedPaths[dir] += 1
+			trackedPaths[dir]++
 			trackedDirs[dir] = true
 		}
 		// Search for existing parent directory relations in the map
-		for trackedPath, _ := range trackedPaths {
+		for trackedPath := range trackedPaths {
 			if trackedDirs[trackedPath] && strings.HasPrefix(dir, trackedPath+pathSeparator) {
-				// Increment score of tracked parent directory
-				trackedPaths[trackedPath] += 1 // for each file
+				// Increment score of tracked parent directory for each file
+				trackedPaths[trackedPath]++
 				Debug.Println("[AG] Increment:", trackedPath, trackedPaths, trackedPaths[trackedPath])
 			}
 		}
