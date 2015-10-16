@@ -426,6 +426,12 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 }
 
 func relativePath(path string, folderPath string) string {
+	if !strings.HasPrefix(path, folderPath) {
+		if realFolderPath, err := filepath.EvalSymlinks(folderPath); err == nil {
+			Trace.Println("Resolving symlink: "+folderPath, "to", realFolderPath)
+			folderPath = realFolderPath
+		}
+	}
 	path = strings.TrimPrefix(path, folderPath)
 	if len(path) == 0 {
 		return path
@@ -449,7 +455,7 @@ func waitForEvent(c chan notify.EventInfo) string {
 
 func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) bool {
 	if len(path) == 0 {
-		return false
+		return true
 	}
 	for _, ignorePath := range ignorePaths {
 		if strings.Contains(path, ignorePath) {
@@ -714,29 +720,31 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	for i := range paths {
 		path := filepath.Clean(paths[i])
 		if path == "." {
-			path = ""
+			path = folderPath
 		}
 		if path == previousPath {
 			continue
 		}
 		previousPath = path
-		fi, _ := os.Stat(path)
-		path = strings.TrimPrefix(path, folderPath)
-		path = strings.TrimPrefix(path, pathSeparator)
+		if folderPath[len(folderPath)-1] != os.PathSeparator {
+			folderPath = folderPath + pathSeparator
+		}
+		Debug.Println("[AG] Analysing path:", folderPath+path)
+		fi, _ := os.Stat(folderPath + path)
 		var dir string
 		if fi == nil {
 			// Definitely inform if the path does not exist anymore
 			dir = path
 			trackedPaths[path] = dirVsFiles
-			Debug.Println("[AG] Not found:", path)
+			Debug.Println("[AG] Not found:", previousPath)
 		} else if fi.IsDir() {
 			// Definitely inform if a directory changed
 			dir = path
 			trackedPaths[path] = dirVsFiles
 			trackedDirs[dir] = true
-			Debug.Println("[AG] Is a dir:", dir)
+			Debug.Println("[AG] Is a dir:", previousPath)
 		} else {
-			Debug.Println("[AG] Is file:", path)
+			Debug.Println("[AG] Is file:", previousPath)
 			// Files are linked to -1 scores
 			// Also increment the parent path with 1
 			dir = filepath.Dir(path)
@@ -816,6 +824,7 @@ func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguratio
 			case "ItemStarted":
 				data := event.Data.(map[string]interface{})
 				ch, ok := stChans[data["folder"].(string)]
+				fmt.Printf("%v\n", data)
 				if !ok {
 					continue
 				}

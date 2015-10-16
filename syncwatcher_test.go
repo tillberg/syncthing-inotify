@@ -12,40 +12,36 @@ import (
 
 var (
 	slash         = string(os.PathSeparator)
-	testDirectory = "test" + slash
+	testDirectory = "test"
 )
 
-func clearTestDir() {
-	os.RemoveAll(testDirectory)
-}
-
 func initTestDir() {
-	clearTestDir()
+	os.RemoveAll(testDirectory)
 	os.MkdirAll(testDirectory, 0755)
 }
 
-func createTestPaths(t *testing.T, fs ...string) []string {
+func createTestPaths(t *testing.T, dir string, fs ...string) []string {
 	rs := make([]string, len(fs))
 	for i, f := range fs {
-		rs[i] = createTestPath(t, f)
+		rs[i] = createTestPath(t, dir, f)
 	}
 	return rs
 }
 
-func createTestPath(t *testing.T, f string) string {
+func createTestPath(t *testing.T, dir, f string) string {
 	if strings.HasSuffix(f, slash) {
-		err := os.MkdirAll(testDirectory+f, 0755)
+		err := os.MkdirAll(dir+slash+f, 0755)
 		if err != nil && !os.IsExist(err) {
 			t.Error("Failed to create test directory", err)
 		}
 		return strings.TrimSuffix(f, slash)
 	} else {
-		err := os.MkdirAll(filepath.Dir(testDirectory+f), 0755)
+		err := os.MkdirAll(filepath.Dir(dir+slash+f), 0755)
 		if err != nil && !os.IsExist(err) {
 			t.Error("Failed to create test directory", err)
 		}
 	}
-	h, err := os.Create(testDirectory + f)
+	h, err := os.Create(dir + slash + f)
 	if err != nil {
 		t.Error("Failed to create test file", err)
 	}
@@ -60,7 +56,7 @@ func TestDebouncedFileWatch(t *testing.T) {
 	testFile := "a" + slash + "file1"
 	testFiles := createTestPaths(t,
 		testFile)
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
@@ -77,7 +73,7 @@ func TestDebouncedFileWatch(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
-		fsChan <- testDirectory + testFiles[i]
+		fsChan <- testDirectory + slash + testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
@@ -89,7 +85,7 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 	// Log directory change
 	testOK := false
 	testRepo := "test1"
-	testFile := createTestPath(t, "a"+slash)
+	testFile := createTestPath(t, testDirectory, "a"+slash)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
@@ -105,7 +101,7 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 		return nil
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
-	fsChan <- testDirectory + testFile
+	fsChan <- testDirectory + slash + testFile
 	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
 		t.Error("Callback not triggered")
@@ -121,7 +117,7 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 		testChangeDir+"file1.txt",
 		testChangeDir+"file2",
 		testChangeDir+"file3.ogg")
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 2
 	stChan := make(chan STEvent, 10)
@@ -138,7 +134,7 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
-		fsChan <- testDirectory + testFiles[i]
+		fsChan <- testDirectory + slash + testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
@@ -158,7 +154,7 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 		testChangeDir1+"file2",
 		testChangeDir2,
 		testChangeDir1+"file3.ogg")
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
@@ -178,7 +174,7 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
-		fsChan <- testDirectory + testFiles[i]
+		fsChan <- testDirectory + slash + testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout * 10)
 	if testOK != 2 {
@@ -194,7 +190,7 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		"a"+slash+"b"+slash+"file1.txt",
 		"a"+slash+"c"+slash+"file2",
 		"a"+slash+"d"+slash+"file3.ogg")
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
@@ -213,7 +209,7 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
-		fsChan <- testDirectory + testFiles[i]
+		fsChan <- testDirectory + slash + testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout * 10)
 	if testOK != 3 {
@@ -232,7 +228,7 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 		"a"+slash+"b"+slash+"file2",
 		"a"+slash+"b"+slash+"file3.ogg",
 		"a"+slash+"b"+slash+"c"+slash+"file4")
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
@@ -252,7 +248,7 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
-		fsChan <- testDirectory + testFiles[i]
+		fsChan <- testDirectory + slash + testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout * 10)
 	if testOK != 2 {
@@ -270,7 +266,7 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 		"file1",
 		"file2",
 		"file3")
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
@@ -287,7 +283,7 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
-		fsChan <- testDirectory + testFiles[i]
+		fsChan <- testDirectory + slash + testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout * 10)
 	if !testOK {
@@ -305,7 +301,7 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 		testChangeDir+"file1.txt",
 		testChangeDir+"file2",
 		testChangeDir+"file3.ogg")
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
@@ -322,7 +318,7 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
-		fsChan <- testDirectory + testFiles[i]
+		fsChan <- testDirectory + slash + testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout * 10)
 	if testOK != 1 {
@@ -338,7 +334,7 @@ func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
 		"a"+slash,
 		"a"+slash+"b"+slash,
 		"a"+slash+"b"+slash+"file1.txt")
-	clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
@@ -355,7 +351,7 @@ func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
-		fsChan <- testDirectory + testFiles[i]
+		fsChan <- testDirectory + slash + testFiles[i]
 	}
 	time.Sleep(testDebounceTimeout * 10)
 	if testOK != 1 {
@@ -371,7 +367,7 @@ func TestSTEvents(t *testing.T) {
 		"file1",
 		"file2",
 		"file3")
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
@@ -389,9 +385,9 @@ func TestSTEvents(t *testing.T) {
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	stChan <- STEvent{Path: ""}
 	for i := range testFiles {
-		stChan <- STEvent{Path: testDirectory + testFiles[i], Finished: false}
+		stChan <- STEvent{Path: testDirectory + slash + testFiles[i], Finished: false}
 		fsChan <- testDirectory + testFiles[i]
-		stChan <- STEvent{Path: testDirectory + testFiles[i], Finished: true}
+		stChan <- STEvent{Path: testDirectory + slash + testFiles[i], Finished: true}
 	}
 	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
@@ -399,15 +395,26 @@ func TestSTEvents(t *testing.T) {
 	}
 }
 
-func TestFilesAggregation(t *testing.T) {
+func TestRealFolderPath(t *testing.T) {
 	nrFiles := 50
 	testOK := false
 	testRepo := "test1"
 	testFiles := make([]string, nrFiles)
-	for i := 0; i < nrFiles; i++ {
-		testFiles[i] = createTestPath(t, "a"+slash+strconv.Itoa(i))
+	oldDir := testDirectory
+	defer func() { testDirectory = oldDir }()
+	root, err := os.Getwd()
+	if err != nil {
+		t.Error("Failed to retrieve pwd", err)
 	}
-	defer clearTestDir()
+	testDirectory = root + "/tmp/testSyncthingInotify"
+	if err := os.Mkdir(testDirectory, 0777); err != nil {
+		t.Log("Creating " + testDirectory + " failed, skipping test")
+		t.Skip()
+	}
+	for i := 0; i < nrFiles; i++ {
+		testFiles[i] = createTestPath(t, testDirectory, "a"+slash+strconv.Itoa(i))
+	}
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := nrFiles + 1
 	stop := make(chan int, 1)
@@ -429,7 +436,7 @@ func TestFilesAggregation(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for _, testFile := range testFiles {
-		fsChan <- testDirectory + testFile
+		fsChan <- testDirectory + slash + testFile
 	}
 	<-stop
 	time.Sleep(250 * time.Millisecond)
@@ -437,15 +444,113 @@ func TestFilesAggregation(t *testing.T) {
 		t.Error("Callback not triggered")
 	}
 }
+
+func TestRealSymlinkFolderPath(t *testing.T) {
+	nrFiles := 50
+	testOK := false
+	testRepo := "test1"
+	testFiles := make([]string, nrFiles)
+	oldDir := testDirectory
+	defer func() { testDirectory = oldDir }()
+	root, err := os.Getwd()
+	if err != nil {
+		t.Error("Failed to retrieve pwd", err)
+	}
+	testDirectory = root + "/tmp/testSyncthingInotify"
+	testLink := root + "/tmp/testSyncthingInotifyLn"
+	if err := os.Mkdir(testDirectory, 0777); err != nil {
+		t.Log("Creating " + testDirectory + " failed, skipping test")
+		t.Skip()
+	} else {
+		defer os.RemoveAll(testDirectory)
+	}
+	if err := os.Symlink(testDirectory, testLink); err != nil {
+		t.Log("Creating symlink " + testLink + " failed, skipping test")
+		t.Skip()
+	} else {
+		defer os.RemoveAll(testLink)
+	}
+	for i := 0; i < nrFiles; i++ {
+		testFiles[i] = createTestPath(t, testLink, "a"+slash+strconv.Itoa(i))
+	}
+	defer os.RemoveAll(testDirectory)
+	testDebounceTimeout := 20 * time.Millisecond
+	testDirVsFiles := nrFiles + 1
+	stop := make(chan int, 1)
+	stChan := make(chan STEvent, nrFiles)
+	fsChan := make(chan string, nrFiles)
+	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
+		if repo != testRepo || len(sub) != 50 || sub[0] != "a/0" {
+			t.Error("Invalid result for directory change: "+repo, sub)
+		}
+		if testOK {
+			t.Error("Callback triggered multiple times")
+		}
+		testOK = true
+		close(stop)
+		return nil
+	}
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	for _, testFile := range testFiles {
+		fsChan <- testLink + slash + testFile
+	}
+	<-stop
+	time.Sleep(250 * time.Millisecond)
+	if !testOK {
+		t.Error("Callback not triggered")
+	}
+}
+func TestFilesAggregation(t *testing.T) {
+	nrFiles := 50
+	testOK := false
+	testRepo := "test1"
+	testFiles := make([]string, nrFiles)
+	for i := 0; i < nrFiles; i++ {
+		testFiles[i] = createTestPath(t, testDirectory, "a"+slash+strconv.Itoa(i))
+	}
+	defer os.RemoveAll(testDirectory)
+	testDebounceTimeout := 20 * time.Millisecond
+	testDirVsFiles := nrFiles + 1
+	stop := make(chan int, 1)
+	stChan := make(chan STEvent, nrFiles)
+	fsChan := make(chan string, nrFiles)
+	fileChange := func(repo string, sub []string) error {
+		if len(sub) == 1 && sub[0] == ".stfolder" {
+			return nil
+		}
+		if repo != testRepo || len(sub) != 50 || sub[0] != "a/0" {
+			t.Error("Invalid result for directory change: "+repo, sub)
+		}
+		if testOK {
+			t.Error("Callback triggered multiple times")
+		}
+		testOK = true
+		close(stop)
+		return nil
+	}
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	for _, testFile := range testFiles {
+		fsChan <- testDirectory + slash + testFile
+	}
+	<-stop
+	time.Sleep(250 * time.Millisecond)
+	if !testOK {
+		t.Error("Callback not triggered")
+	}
+}
+
 func TestManyFilesAggregation(t *testing.T) {
 	nrFiles := 5000
 	testOK := false
 	testRepo := "test1"
 	testFiles := make([]string, nrFiles)
 	for i := 0; i < nrFiles; i++ {
-		testFiles[i] = createTestPath(t, "a"+slash+strconv.Itoa(i))
+		testFiles[i] = createTestPath(t, testDirectory, "a"+slash+strconv.Itoa(i))
 	}
-	defer clearTestDir()
+	defer os.RemoveAll(testDirectory)
 	testDebounceTimeout := 20 * time.Millisecond
 	testDirVsFiles := 10
 	stop := make(chan int, 1)
@@ -467,7 +572,7 @@ func TestManyFilesAggregation(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for _, testFile := range testFiles {
-		fsChan <- testDirectory + testFile
+		fsChan <- testDirectory + slash + testFile
 	}
 	<-stop
 	time.Sleep(250 * time.Millisecond)
@@ -505,7 +610,7 @@ func TestDeletesAggregation(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for _, testFile := range testFiles {
-		fsChan <- testDirectory + testFile
+		fsChan <- testDirectory + slash + testFile
 	}
 	<-stop
 	time.Sleep(250 * time.Millisecond)
@@ -542,7 +647,7 @@ func TestManyDeletesAggregation(t *testing.T) {
 	}
 	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for _, testFile := range testFiles {
-		fsChan <- testDirectory + testFile
+		fsChan <- testDirectory + slash + testFile
 	}
 	<-stop
 	time.Sleep(250 * time.Millisecond)
