@@ -30,11 +30,13 @@ import (
 	"github.com/zillode/notify"
 )
 
+// Configuration is used in parsing response from ST
 type Configuration struct {
 	Version int
 	Folders []FolderConfiguration
 }
 
+// FolderConfiguration holds information about shared folder in ST
 type FolderConfiguration struct {
 	ID              string
 	Path            string
@@ -42,11 +44,13 @@ type FolderConfiguration struct {
 	RescanIntervalS int
 }
 
+// Pattern holds ignored path and a boolean which value is false when we should use the pattern in exclude mode
 type Pattern struct {
 	match   *regexp.Regexp
 	include bool
 }
 
+// Event holds full event data coming from Syncthing REST API
 type Event struct {
 	ID   int         `json:"id"`
 	Time time.Time   `json:"time"`
@@ -54,15 +58,18 @@ type Event struct {
 	Data interface{} `json:"data"`
 }
 
+// STEvent holds simplified data for Syncthing event. Path can be empty in the case of event.type="RemoteIndexUpdated"
 type STEvent struct {
 	Path     string
 	Finished bool
 }
 
+// STNestedConfig is used for unpacking config from XML format
 type STNestedConfig struct {
 	Config STConfig `xml:"gui"`
 }
 
+// STConfig is used for unpacking gui part of config from XML format
 type STConfig struct {
 	CsrfFile string
 	APIKey   string `xml:"apikey"`
@@ -75,7 +82,7 @@ type STConfig struct {
 type folderSlice []string
 
 type progressTime struct {
-	fsEvent bool
+	fsEvent bool // true - event was triggered by filesystem, false - by Syncthing
 	time    time.Time
 }
 
@@ -119,9 +126,9 @@ var (
 	ignorePaths  = []string{".stversions", ".syncthing.", "~syncthing~"}
 	Version      = "unknown-dev"
 	Discard      = log.New(ioutil.Discard, "", log.Ldate)
-	Warning      = Discard // 1
-	OK           = Discard
-	Trace        = Discard
+	Warning      = Discard // verbosity=1
+	OK           = Discard // 2
+	Trace        = Discard // 3
 	Debug        = Discard // 4
 	watchFolders folderSlice
 	skipFolders  folderSlice
@@ -244,8 +251,8 @@ func init() {
 	}
 }
 
+// main reads configs, starts all gouroutines and waits until a message is in channel stop.
 func main() {
-
 	backoff.Retry(testWebGuiPost, backoff.NewExponentialBackOff())
 
 	allFolders := getFolders()
@@ -266,9 +273,10 @@ func main() {
 	code := <-stop
 	OK.Println("Exiting")
 	os.Exit(code)
-
 }
 
+// Restart uses path to itself and copy of environment to start new process.
+// Then it sends message to stop channel to shutdown itself.
 func restart() bool {
 	pgm, err := exec.LookPath(os.Args[0])
 	if err != nil {
@@ -293,6 +301,7 @@ func restart() bool {
 	return true
 }
 
+// filterFolders refines folders list using global vars watchFolders and skipFolders
 func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 	if len(watchFolders) > 0 {
 		var fs []FolderConfiguration
@@ -325,6 +334,8 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 	return folders
 }
 
+// getIgnorePatterns retrieves the list of ignored patterns for a folder from Syncthing.
+// It blocks until ST responds with success.
 func getIgnorePatterns(folder string) []Pattern {
 	for {
 		Trace.Println("Getting ignore patterns for " + folder)
@@ -370,6 +381,7 @@ func getIgnorePatterns(folder string) []Pattern {
 	}
 }
 
+// getFolders returns the list of folders configured in Syncthing. Blocks until ST responded successfully.
 func getFolders() []FolderConfiguration {
 	Trace.Println("Getting Folders")
 	r, err := http.NewRequest("GET", target+"/rest/system/config", nil)
@@ -397,6 +409,8 @@ func getFolders() []FolderConfiguration {
 	return cfg.Folders
 }
 
+// watchFolder installs inotify watcher for a folder, launches
+// goroutine which receives changed items. It never exits.
 func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	folderPath := expandTilde(folder.Path)
 	ignorePatterns := getIgnorePatterns(folder.ID)
@@ -413,6 +427,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	if folder.RescanIntervalS < 1800 && delayScan <= 0 {
 		OK.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
 	}
+	// will we ever get out of this loop?
 	for {
 		evPath := waitForEvent(c)
 		Debug.Println("Change detected in: " + evPath + " (could still be ignored)")
@@ -436,16 +451,20 @@ func relativePath(path string, folderPath string) string {
 	return path
 }
 
+// waitForEvent waits for an event in a channel c and returns event.Path().
+// When channel c is closed then it returns path for default event (not sure if this is used at all?)
 func waitForEvent(c chan notify.EventInfo) string {
 	select {
 	case ev, ok := <-c:
 		if !ok {
+			// this is never reached b/c c is never closed
 			Warning.Println("Error: channel closed")
 		}
 		return ev.Path()
 	}
 }
 
+// shouldIgnore determines if path should be ignored using ignorePaths and ignorePatterns
 func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) bool {
 	if len(path) == 0 {
 		return false
@@ -475,6 +494,7 @@ func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) b
 	return false
 }
 
+// performRequest performs preparations to make an HTTP request r to Synthing API
 func performRequest(r *http.Request) (*http.Response, error) {
 	if r == nil {
 		return nil, errors.New("Invalid HTTP Request object")
@@ -501,6 +521,7 @@ func performRequest(r *http.Request) (*http.Response, error) {
 	return res, err
 }
 
+// testWebGuiPost tries to connect to Syncthing returning nil on success
 func testWebGuiPost() error {
 	Trace.Println("Testing WebGUI")
 	r, err := http.NewRequest("GET", target+"/rest/404", nil)
@@ -522,6 +543,7 @@ func testWebGuiPost() error {
 	return nil
 }
 
+// informError sends a msg error to Syncthing
 func informError(msg string) error {
 	Trace.Printf("Informing ST about inotify error: %v", msg)
 	r, _ := http.NewRequest("POST", target+"/rest/system/error", strings.NewReader("[Inotify] "+msg))
@@ -547,6 +569,7 @@ func informError(msg string) error {
 	return err
 }
 
+// informChange sends a request to rescan folder and subs to Syncthing
 func informChange(folder string, subs []string) error {
 	data := url.Values{}
 	data.Set("folder", folder)
@@ -585,13 +608,24 @@ func informChange(folder string, subs []string) error {
 	return err
 }
 
+// InformCallback is a function which will be called from accumulateChanges when there is a change we need to inform Syncthing about
+type InformCallback func(folder string, subs []string) error
+
+// accumulateChanges filters out events that originate from ST.
+// - it aggregates changes based on hierarchy structure
+// - no redundant folder searches (abc + abc/d is useless)
+// - no excessive large scans (abc/{1..1000} should become a scan of just abc folder)
+// One of the difficulties is that we cannot know if deleted files were a directory or a file.
 func accumulateChanges(debounceTimeout time.Duration,
-	folder string, folderPath string, dirVsFiles int,
-	stInput chan STEvent, fsInput chan string,
-	callback func(folder string, subs []string) error) func(string) {
+	folder string,
+	folderPath string,
+	dirVsFiles int,
+	stInput chan STEvent,
+	fsInput chan string,
+	callback InformCallback) func(string) {
 	delayScanInterval := time.Duration(delayScan-5) * time.Second
 	Debug.Printf("Delay scan reminder interval for %s set to %.0f seconds\n", folder, delayScanInterval.Seconds())
-	inProgress := make(map[string]progressTime)       // [path string, start+fs pair]
+	inProgress := make(map[string]progressTime)       // [path string]{fs, start}
 	currInterval := delayScanInterval                 // Timeout of the timer
 	callback(folder, []string{".stfolder"})           // Inform Syncthing to delay scan interval
 	nextScanTime := time.Now().Add(delayScanInterval) // Time to remind Syncthing to delay scan
@@ -699,17 +733,22 @@ func accumulateChanges(debounceTimeout time.Duration,
 	}
 }
 
-func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback func(folder string, folderPaths []string) error, paths []string) error {
-	// This function optimises tracking in two ways:
-	//	- If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
-	//	- Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
+// AggregateChanges optimises tracking in two ways:
+// - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
+// - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
+func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback InformCallback, paths []string) error {
 	if len(paths) == 0 {
 		return errors.New("No changes to aggregate")
 	}
-	trackedPaths := make(map[string]int) // Map paths to scores; if score == -1 the path is a filename
-	trackedDirs := make(map[string]bool) // Map of directories
-	sort.Strings(paths)                  // Make sure parent paths are processed first
-	previousPath := ""                   // Filter duplicates
+	// Map paths to scores; if score == -1 the path is a filename
+	trackedPaths := make(map[string]int)
+	// Map of directories
+	trackedDirs := make(map[string]bool)
+	// Make sure parent paths are processed first
+	sort.Strings(paths)
+	// For removing duplicates in a sorted list
+	previousPath := ""
+	// First we collect all paths and calculate scores for them
 	for i := range paths {
 		path := filepath.Clean(paths[i])
 		if path == "." {
@@ -762,6 +801,7 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	sort.Strings(keys) // Sort directories before their own files
 	previousPath = ""
 	var scans []string
+	// Decide if we should inform about particular path based on dirVsFiles
 	for i := range keys {
 		trackedPath := keys[i]
 		trackedPathScore, _ := trackedPaths[trackedPath]
@@ -784,6 +824,9 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	return callback(folder, scans)
 }
 
+// watchSTEvents reads events from Syncthing. For events of type ItemStarted and ItemFinished it puts
+// them into aproppriate stChans, where key is a folder from event.
+// For ConfigSaved event it spawns goroutine waitForSyncAndExitIfNeeded.
 func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguration) {
 	lastSeenID := 0
 	for {
@@ -835,6 +878,7 @@ func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguratio
 	}
 }
 
+// getSTEvents returns a list of events which happened in Syncthing since lastSeenID.
 func getSTEvents(lastSeenID int) ([]Event, error) {
 	Trace.Println("Requesting STEvents: " + strconv.Itoa(lastSeenID))
 	r, err := http.NewRequest("GET", target+"/rest/events?since="+strconv.Itoa(lastSeenID), nil)
@@ -861,6 +905,7 @@ func getSTEvents(lastSeenID int) ([]Event, error) {
 	return events, err
 }
 
+// waitForSyncAndExitIfNeeded performs restart of itself if folders has different configuration in syncthing.
 func waitForSyncAndExitIfNeeded(folders []FolderConfiguration) {
 	waitForSync()
 	newFolders := getFolders()
@@ -888,6 +933,7 @@ func waitForSyncAndExitIfNeeded(folders []FolderConfiguration) {
 	}
 }
 
+// waitForSync blocks execution until syncthing is in sync
 func waitForSync() {
 	for {
 		Trace.Println("Waiting for Sync")
@@ -946,6 +992,7 @@ func expandTilde(p string) string {
 	}
 	return filepath.Join(getHomeDir(), p[2:])
 }
+
 func optionTable(w io.Writer, rows [][]string) {
 	tw := tabwriter.NewWriter(w, 2, 4, 2, ' ', 0)
 	for _, row := range rows {
