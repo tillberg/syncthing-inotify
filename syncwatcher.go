@@ -44,13 +44,13 @@ type FolderConfiguration struct {
 	RescanIntervalS int
 }
 
-// Pattern holds ignored path and boolean which value if false when we should use the pattern in exclude mode
+// Pattern holds ignored path and a boolean which value is false when we should use the pattern in exclude mode
 type Pattern struct {
 	match   *regexp.Regexp
 	include bool
 }
 
-// Event holds full event data coming from request to ST REST API
+// Event holds full event data coming from Syncthing REST API
 type Event struct {
 	ID   int         `json:"id"`
 	Time time.Time   `json:"time"`
@@ -58,7 +58,7 @@ type Event struct {
 	Data interface{} `json:"data"`
 }
 
-// STEvent holds simplified data for ST Even. Path can be empty in the case of event.type="RemoteIndexUpdated"
+// STEvent holds simplified data for Syncthing event. Path can be empty in the case of event.type="RemoteIndexUpdated"
 type STEvent struct {
 	Path     string
 	Finished bool
@@ -69,7 +69,7 @@ type STNestedConfig struct {
 	Config STConfig `xml:"gui"`
 }
 
-// STConfig is used for unpacking gui config from XML format
+// STConfig is used for unpacking gui part of config from XML format
 type STConfig struct {
 	CsrfFile string
 	APIKey   string `xml:"apikey"`
@@ -82,7 +82,7 @@ type STConfig struct {
 type folderSlice []string
 
 type progressTime struct {
-	fsEvent bool // true - event triggered by filesystem, false - by ST
+	fsEvent bool // true - event was triggered by filesystem, false - by Syncthing
 	time    time.Time
 }
 
@@ -251,7 +251,7 @@ func init() {
 	}
 }
 
-// Reads configs, starts all gouroutines and waits until messages is received in channel stop.
+// main reads configs, starts all gouroutines and waits until a message is in channel stop.
 func main() {
 	backoff.Retry(testWebGuiPost, backoff.NewExponentialBackOff())
 
@@ -334,7 +334,7 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 	return folders
 }
 
-// getIgnorePatterns retrieves the list of ignored patterns for a folder from ST API.
+// getIgnorePatterns retrieves the list of ignored patterns for a folder from Syncthing.
 // It blocks until ST responds with success.
 func getIgnorePatterns(folder string) []Pattern {
 	for {
@@ -381,7 +381,7 @@ func getIgnorePatterns(folder string) []Pattern {
 	}
 }
 
-// getFolders retrieves the list of folders configured from ST API. Blocks until success.
+// getFolders returns the list of folders configured in Syncthing. Blocks until ST responded successfully.
 func getFolders() []FolderConfiguration {
 	Trace.Println("Getting Folders")
 	r, err := http.NewRequest("GET", target+"/rest/system/config", nil)
@@ -410,7 +410,7 @@ func getFolders() []FolderConfiguration {
 }
 
 // watchFolder installs inotify watcher for a folder, launches
-// goroutine which receives changes items. It never exits.
+// goroutine which receives changed items. It never exits.
 func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	folderPath := expandTilde(folder.Path)
 	ignorePatterns := getIgnorePatterns(folder.ID)
@@ -451,8 +451,8 @@ func relativePath(path string, folderPath string) string {
 	return path
 }
 
-// waitForEvent waits for even in channel c and returns event.Path().
-// When channel c is closed then returns path for default event?
+// waitForEvent waits for an event in a channel c and returns event.Path().
+// When channel c is closed then it returns path for default event (not sure if this is used at all?)
 func waitForEvent(c chan notify.EventInfo) string {
 	select {
 	case ev, ok := <-c:
@@ -464,7 +464,7 @@ func waitForEvent(c chan notify.EventInfo) string {
 	}
 }
 
-// shouldIgnore determines if path should be ignored based on ignorePaths and ignorePatterns
+// shouldIgnore determines if path should be ignored using ignorePaths and ignorePatterns
 func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) bool {
 	if len(path) == 0 {
 		return false
@@ -494,6 +494,7 @@ func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) b
 	return false
 }
 
+// performRequest performs preparations to make an HTTP request r to Synthing API
 func performRequest(r *http.Request) (*http.Response, error) {
 	if r == nil {
 		return nil, errors.New("Invalid HTTP Request object")
@@ -520,7 +521,7 @@ func performRequest(r *http.Request) (*http.Response, error) {
 	return res, err
 }
 
-// testWebGuiPost tries to connect to ST returning nil on success
+// testWebGuiPost tries to connect to Syncthing returning nil on success
 func testWebGuiPost() error {
 	Trace.Println("Testing WebGUI")
 	r, err := http.NewRequest("GET", target+"/rest/404", nil)
@@ -542,7 +543,7 @@ func testWebGuiPost() error {
 	return nil
 }
 
-// informError sends msg error to ST through API
+// informError sends a msg error to Syncthing
 func informError(msg string) error {
 	Trace.Printf("Informing ST about inotify error: %v", msg)
 	r, _ := http.NewRequest("POST", target+"/rest/system/error", strings.NewReader("[Inotify] "+msg))
@@ -568,7 +569,7 @@ func informError(msg string) error {
 	return err
 }
 
-// informChange sends request to rescan folder and subs to ST API
+// informChange sends a request to rescan folder and subs to Syncthing
 func informChange(folder string, subs []string) error {
 	data := url.Values{}
 	data.Set("folder", folder)
@@ -607,6 +608,7 @@ func informChange(folder string, subs []string) error {
 	return err
 }
 
+// InformCallback is a function which will be called from accumulateChanges when there is a change we need to inform Syncthing about
 type InformCallback func(folder string, subs []string) error
 
 // accumulateChanges filters out events that originate from ST.
@@ -822,9 +824,9 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 	return callback(folder, scans)
 }
 
-// watchSTEvents reads events from syncthing. For events ItemStarted, ItemFinished it puts
-// them into aproppriate stChans, where key is folder from event.
-// For ConfigSaved event it restarts application when configs has changed.
+// watchSTEvents reads events from Syncthing. For events of type ItemStarted and ItemFinished it puts
+// them into aproppriate stChans, where key is a folder from event.
+// For ConfigSaved event it spawns goroutine waitForSyncAndExitIfNeeded.
 func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguration) {
 	lastSeenID := 0
 	for {
@@ -876,8 +878,7 @@ func watchSTEvents(stChans map[string]chan STEvent, folders []FolderConfiguratio
 	}
 }
 
-// getSTEvents requests list of events from syncthing and returns them as list of events
-// which happened since lastSeenID.
+// getSTEvents returns a list of events which happened in Syncthing since lastSeenID.
 func getSTEvents(lastSeenID int) ([]Event, error) {
 	Trace.Println("Requesting STEvents: " + strconv.Itoa(lastSeenID))
 	r, err := http.NewRequest("GET", target+"/rest/events?since="+strconv.Itoa(lastSeenID), nil)
