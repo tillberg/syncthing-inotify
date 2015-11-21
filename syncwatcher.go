@@ -215,6 +215,7 @@ func init() {
 			} else {
 				target = "http://" + c.Target
 			}
+			target = strings.Replace(target, "0.0.0.0", "127.0.0.1", 1)
 			apiKey = c.APIKey
 		}
 	}
