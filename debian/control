@@ -1,0 +1,6 @@
+Package: syncthing-inotify
+Architecture: {{arch}}
+Depends: libc6
+Version: {{version}}
+Maintainer: {{mntner}}
+Description: File watcher intended for use with Syncthing
