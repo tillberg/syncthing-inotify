@@ -34,8 +34,10 @@ debianDir() { # arch
 		| sed "s/{{version}}/$version/" \
 		> deb/DEBIAN/changelog
 
-	mkdir -p deb/lib
-	cp -r etc/linux-systemd deb/lib/systemd
+	mkdir -p deb/lib/systemd
+	mkdir -p deb/usr/lib/systemd
+	cp -r etc/linux-systemd/system deb/lib/systemd
+	cp -r etc/linux-systemd/user deb/usr/lib/systemd
 }
 
 # For each supported architecture (in Debian format), compile and pack into
