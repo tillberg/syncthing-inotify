@@ -495,19 +495,27 @@ func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) b
 	return false
 }
 
-// performRequest performs preparations to make an HTTP request r to Synthing API
-func performRequest(r *http.Request) (*http.Response, error) {
-	if r == nil {
+func prepareApiRequestForSyncthing(request *http.Request) (*http.Request, error) {
+	if request == nil {
 		return nil, errors.New("Invalid HTTP Request object")
 	}
 	if len(csrfToken) > 0 {
-		r.Header.Set("X-CSRF-Token", csrfToken)
+		request.Header.Set("X-CSRF-Token", csrfToken)
 	}
 	if len(authUser) > 0 {
-		r.SetBasicAuth(authUser, authPass)
+		request.SetBasicAuth(authUser, authPass)
 	}
 	if len(apiKey) > 0 {
-		r.Header.Set("X-API-Key", apiKey)
+		request.Header.Set("X-API-Key", apiKey)
+	}
+	return request, nil
+}
+
+// performRequest performs an HTTP request r to Synthing API
+func performRequest(r *http.Request) (*http.Response, error) {
+	request, err := prepareApiRequestForSyncthing(r)
+	if request == nil {
+		return nil, err
 	}
 	tr := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
@@ -518,7 +526,7 @@ func performRequest(r *http.Request) (*http.Response, error) {
 		Transport: tr,
 		Timeout:   requestTimeout,
 	}
-	res, err := client.Do(r)
+	res, err := client.Do(request)
 	return res, err
 }
 
