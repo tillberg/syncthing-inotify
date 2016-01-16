@@ -335,6 +335,12 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 	return folders
 }
 
+func closeRequestResult(result *http.Response) {
+	if result != nil && result.Body != nil {
+		result.Body.Close()
+	}
+}
+
 // getIgnorePatterns retrieves the list of ignored patterns for a folder from Syncthing.
 // It blocks until ST responds with success.
 func getIgnorePatterns(folder string) []Pattern {
@@ -342,11 +348,7 @@ func getIgnorePatterns(folder string) []Pattern {
 		Trace.Println("Getting ignore patterns for " + folder)
 		r, err := http.NewRequest("GET", target+"/rest/db/ignores?folder="+url.QueryEscape(folder), nil)
 		res, err := performRequest(r)
-		defer func() {
-			if res != nil && res.Body != nil {
-				res.Body.Close()
-			}
-		}()
+		defer closeRequestResult(res)
 		if err != nil {
 			Warning.Println("Failed to perform request /rest/db/ignores?folder="+url.QueryEscape(folder), err)
 			time.Sleep(configSyncTimeout)
@@ -387,11 +389,7 @@ func getFolders() []FolderConfiguration {
 	Trace.Println("Getting Folders")
 	r, err := http.NewRequest("GET", target+"/rest/system/config", nil)
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		log.Fatalln("Failed to perform request /rest/system/config: ", err)
 	}
@@ -539,11 +537,7 @@ func testWebGuiPost() error {
 	Trace.Println("Testing WebGUI")
 	r, err := http.NewRequest("GET", target+"/rest/404", nil)
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		Warning.Println("Cannot connect to Syncthing:", err)
 		return err
@@ -562,11 +556,7 @@ func informError(msg string) error {
 	r, _ := http.NewRequest("POST", target+"/rest/system/error", strings.NewReader("[Inotify] "+msg))
 	r.Header.Set("Content-Type", "plain/text")
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		Warning.Println("Failed to inform Syncthing about", msg, err)
 		return err
@@ -591,11 +581,7 @@ func informChange(folder string, subs []string) error {
 	Trace.Printf("Informing ST: %v: %v", folder, subs)
 	r, _ := http.NewRequest("POST", target+"/rest/db/scan?"+data.Encode(), nil)
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		Warning.Println("Failed to perform request", err)
 		return err
@@ -894,11 +880,7 @@ func getSTEvents(lastSeenID int) ([]Event, error) {
 	Trace.Println("Requesting STEvents: " + strconv.Itoa(lastSeenID))
 	r, err := http.NewRequest("GET", target+"/rest/events?since="+strconv.Itoa(lastSeenID), nil)
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		Warning.Println("Failed to perform request", err)
 		return nil, err
@@ -950,11 +932,7 @@ func waitForSync() {
 		Trace.Println("Waiting for Sync")
 		r, err := http.NewRequest("GET", target+"/rest/system/config/insync", nil)
 		res, err := performRequest(r)
-		defer func() {
-			if res != nil && res.Body != nil {
-				res.Body.Close()
-			}
-		}()
+		defer closeRequestResult(res)
 		if err != nil {
 			Warning.Println("Failed to perform request /rest/system/config/insync", err)
 			time.Sleep(configSyncTimeout)
