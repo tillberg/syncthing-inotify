@@ -4,7 +4,7 @@
 
 oses = {
   "darwin" => ["amd64"],
-  "dragonfly" => ["386", "amd64"],
+  "dragonfly" => ["amd64"],
   "freebsd" => ["386", "amd64", "arm"],
   "linux" => ["386", "amd64", "arm"],
   "netbsd" => ["386", "amd64"],
@@ -38,7 +38,7 @@ end
       if arch.include?("arm")
         vars += " GOARM=5"
       end
-      ldflags = "-w -X main.Version #{version}"
+      ldflags = "-w -X main.Version=#{version}"
       build = "#{vars} go build -ldflags '#{ldflags}'"
       package = "tar -czf syncthing-inotify-#{os}-#{arch}-#{version}.tar.gz #{name}"
       remove = "rm #{name}"
