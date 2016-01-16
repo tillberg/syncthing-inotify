@@ -612,6 +612,12 @@ func informChange(folder string, subs []string) error {
 // InformCallback is a function which will be called from accumulateChanges when there is a change we need to inform Syncthing about
 type InformCallback func(folder string, subs []string) error
 
+func askToDelayScan(folder string) {
+	// TODO: check the return value
+	Trace.Println("Asking to delay full scanning of " + folder)
+	informChange(folder, []string{".stfolder"})
+}
+
 // accumulateChanges filters out events that originate from ST.
 // - it aggregates changes based on hierarchy structure
 // - no redundant folder searches (abc + abc/d is useless)
@@ -628,7 +634,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 	Debug.Printf("Delay scan reminder interval for %s set to %.0f seconds\n", folder, delayScanInterval.Seconds())
 	inProgress := make(map[string]progressTime)       // [path string]{fs, start}
 	currInterval := delayScanInterval                 // Timeout of the timer
-	callback(folder, []string{".stfolder"})           // Inform Syncthing to delay scan interval
+	askToDelayScan(folder)
 	nextScanTime := time.Now().Add(delayScanInterval) // Time to remind Syncthing to delay scan
 	for {
 		select {
@@ -670,8 +676,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 		case <-time.After(currInterval):
 			if delayScan > 0 && nextScanTime.Before(time.Now()) {
 				nextScanTime = time.Now().Add(delayScanInterval)
-				Debug.Println("Periodically extend the nextScan interval for " + folder)
-				callback(folder, []string{".stfolder"})
+				askToDelayScan(folder)
 			}
 			if len(inProgress) == 0 {
 				if currInterval != delayScanInterval {
