@@ -613,9 +613,10 @@ func informChange(folder string, subs []string) error {
 type InformCallback func(folder string, subs []string) error
 
 func askToDelayScan(folder string) {
-	// TODO: check the return value
 	Trace.Println("Asking to delay full scanning of " + folder)
-	informChange(folder, []string{".stfolder"})
+	if err := informChange(folder, []string{".stfolder"}); err != nil {
+		Warning.Printf("Request to delay scanning of " + folder + " failed")
+	}
 }
 
 // accumulateChanges filters out events that originate from ST.
