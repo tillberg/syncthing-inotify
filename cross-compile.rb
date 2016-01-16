@@ -14,7 +14,7 @@ oses = {
 version = `git describe --abbrev=0 --tags`.chomp
 diff = `git diff`.chomp
 
-if diff
+unless diff.empty?
   puts "Forgot to git reset --hard?"
   exit if gets.chomp != "n"
 end
