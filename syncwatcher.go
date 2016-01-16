@@ -255,6 +255,8 @@ func init() {
 // main reads configs, starts all gouroutines and waits until a message is in channel stop.
 func main() {
 	backoff.Retry(testWebGuiPost, backoff.NewExponentialBackOff())
+	// Attempt to increase the limit on number of open files to the maximum allowed.
+	MaximizeOpenFileLimit()
 
 	allFolders := getFolders()
 	folders := filterFolders(allFolders)
