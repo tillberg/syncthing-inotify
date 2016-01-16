@@ -416,8 +416,14 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	fsInput := make(chan string)
 	c := make(chan notify.EventInfo, maxFiles)
 	if err := notify.Watch(filepath.Join(folderPath, "..."), c, notify.All); err != nil {
-		Warning.Println("Failed to install inotify handlers", err)
-		informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
+		if strings.Contains(err.Error(), "too many open files") || strings.Contains(err.Error(), "no space left on device") {
+			msg := "Failed to install inotify handler for " + folder.ID + ". Please increase inotify limits, see http://bit.ly/1PxkdUC for more information."
+			Warning.Println(msg, err)
+			informError(msg)
+		} else {
+			Warning.Println("Failed to install inotify handlers", err)
+			informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
+		}
 		return
 	}
 	defer notify.Stop(c)
