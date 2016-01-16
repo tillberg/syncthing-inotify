@@ -527,6 +527,10 @@ func performRequest(r *http.Request) (*http.Response, error) {
 		Timeout:   requestTimeout,
 	}
 	res, err := client.Do(request)
+	if res != nil && res.StatusCode == 403 {
+		Warning.Printf("Error: HTTP POST forbidden. Missing API key?")
+		return res, errors.New("HTTP POST forbidden")
+	}
 	return res, err
 }
 
@@ -567,10 +571,6 @@ func informError(msg string) error {
 		Warning.Println("Failed to inform Syncthing about", msg, err)
 		return err
 	}
-	if res.StatusCode == 403 {
-		Warning.Printf("Error: HTTP POST forbidden. Missing API key?")
-		return errors.New("HTTP POST forbidden")
-	}
 	if res.StatusCode != 200 {
 		Warning.Printf("Error: Status %d != 200 for POST: %v\n", res.StatusCode, msg)
 		return errors.New("Invalid HTTP status code")
@@ -599,10 +599,6 @@ func informChange(folder string, subs []string) error {
 	if err != nil {
 		Warning.Println("Failed to perform request", err)
 		return err
-	}
-	if res.StatusCode == 403 {
-		Warning.Printf("Error: HTTP POST forbidden. missing API key?")
-		return errors.New("HTTP POST forbidden")
 	}
 	if res.StatusCode != 200 {
 		msg, _ := ioutil.ReadAll(res.Body)
