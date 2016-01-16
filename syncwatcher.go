@@ -335,6 +335,12 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 	return folders
 }
 
+func closeRequestResult(result *http.Response) {
+	if result != nil && result.Body != nil {
+		result.Body.Close()
+	}
+}
+
 // getIgnorePatterns retrieves the list of ignored patterns for a folder from Syncthing.
 // It blocks until ST responds with success.
 func getIgnorePatterns(folder string) []Pattern {
@@ -342,11 +348,7 @@ func getIgnorePatterns(folder string) []Pattern {
 		Trace.Println("Getting ignore patterns for " + folder)
 		r, err := http.NewRequest("GET", target+"/rest/db/ignores?folder="+url.QueryEscape(folder), nil)
 		res, err := performRequest(r)
-		defer func() {
-			if res != nil && res.Body != nil {
-				res.Body.Close()
-			}
-		}()
+		defer closeRequestResult(res)
 		if err != nil {
 			Warning.Println("Failed to perform request /rest/db/ignores?folder="+url.QueryEscape(folder), err)
 			time.Sleep(configSyncTimeout)
@@ -387,11 +389,7 @@ func getFolders() []FolderConfiguration {
 	Trace.Println("Getting Folders")
 	r, err := http.NewRequest("GET", target+"/rest/system/config", nil)
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		log.Fatalln("Failed to perform request /rest/system/config: ", err)
 	}
@@ -495,19 +493,27 @@ func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) b
 	return false
 }
 
-// performRequest performs preparations to make an HTTP request r to Synthing API
-func performRequest(r *http.Request) (*http.Response, error) {
-	if r == nil {
+func prepareApiRequestForSyncthing(request *http.Request) (*http.Request, error) {
+	if request == nil {
 		return nil, errors.New("Invalid HTTP Request object")
 	}
 	if len(csrfToken) > 0 {
-		r.Header.Set("X-CSRF-Token", csrfToken)
+		request.Header.Set("X-CSRF-Token", csrfToken)
 	}
 	if len(authUser) > 0 {
-		r.SetBasicAuth(authUser, authPass)
+		request.SetBasicAuth(authUser, authPass)
 	}
 	if len(apiKey) > 0 {
-		r.Header.Set("X-API-Key", apiKey)
+		request.Header.Set("X-API-Key", apiKey)
+	}
+	return request, nil
+}
+
+// performRequest performs an HTTP request r to Synthing API
+func performRequest(r *http.Request) (*http.Response, error) {
+	request, err := prepareApiRequestForSyncthing(r)
+	if request == nil {
+		return nil, err
 	}
 	tr := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
@@ -518,7 +524,11 @@ func performRequest(r *http.Request) (*http.Response, error) {
 		Transport: tr,
 		Timeout:   requestTimeout,
 	}
-	res, err := client.Do(r)
+	res, err := client.Do(request)
+	if res != nil && res.StatusCode == 403 {
+		Warning.Printf("Error: HTTP POST forbidden. Missing API key?")
+		return res, errors.New("HTTP POST forbidden")
+	}
 	return res, err
 }
 
@@ -527,11 +537,7 @@ func testWebGuiPost() error {
 	Trace.Println("Testing WebGUI")
 	r, err := http.NewRequest("GET", target+"/rest/404", nil)
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		Warning.Println("Cannot connect to Syncthing:", err)
 		return err
@@ -550,18 +556,10 @@ func informError(msg string) error {
 	r, _ := http.NewRequest("POST", target+"/rest/system/error", strings.NewReader("[Inotify] "+msg))
 	r.Header.Set("Content-Type", "plain/text")
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		Warning.Println("Failed to inform Syncthing about", msg, err)
 		return err
-	}
-	if res.StatusCode == 403 {
-		Warning.Printf("Error: HTTP POST forbidden. Missing API key?")
-		return errors.New("HTTP POST forbidden")
 	}
 	if res.StatusCode != 200 {
 		Warning.Printf("Error: Status %d != 200 for POST: %v\n", res.StatusCode, msg)
@@ -583,18 +581,10 @@ func informChange(folder string, subs []string) error {
 	Trace.Printf("Informing ST: %v: %v", folder, subs)
 	r, _ := http.NewRequest("POST", target+"/rest/db/scan?"+data.Encode(), nil)
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		Warning.Println("Failed to perform request", err)
 		return err
-	}
-	if res.StatusCode == 403 {
-		Warning.Printf("Error: HTTP POST forbidden. missing API key?")
-		return errors.New("HTTP POST forbidden")
 	}
 	if res.StatusCode != 200 {
 		msg, _ := ioutil.ReadAll(res.Body)
@@ -612,6 +602,13 @@ func informChange(folder string, subs []string) error {
 // InformCallback is a function which will be called from accumulateChanges when there is a change we need to inform Syncthing about
 type InformCallback func(folder string, subs []string) error
 
+func askToDelayScan(folder string) {
+	Trace.Println("Asking to delay full scanning of " + folder)
+	if err := informChange(folder, []string{".stfolder"}); err != nil {
+		Warning.Printf("Request to delay scanning of " + folder + " failed")
+	}
+}
+
 // accumulateChanges filters out events that originate from ST.
 // - it aggregates changes based on hierarchy structure
 // - no redundant folder searches (abc + abc/d is useless)
@@ -628,7 +625,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 	Debug.Printf("Delay scan reminder interval for %s set to %.0f seconds\n", folder, delayScanInterval.Seconds())
 	inProgress := make(map[string]progressTime)       // [path string]{fs, start}
 	currInterval := delayScanInterval                 // Timeout of the timer
-	callback(folder, []string{".stfolder"})           // Inform Syncthing to delay scan interval
+	askToDelayScan(folder)
 	nextScanTime := time.Now().Add(delayScanInterval) // Time to remind Syncthing to delay scan
 	for {
 		select {
@@ -670,8 +667,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 		case <-time.After(currInterval):
 			if delayScan > 0 && nextScanTime.Before(time.Now()) {
 				nextScanTime = time.Now().Add(delayScanInterval)
-				Debug.Println("Periodically extend the nextScan interval for " + folder)
-				callback(folder, []string{".stfolder"})
+				askToDelayScan(folder)
 			}
 			if len(inProgress) == 0 {
 				if currInterval != delayScanInterval {
@@ -884,11 +880,7 @@ func getSTEvents(lastSeenID int) ([]Event, error) {
 	Trace.Println("Requesting STEvents: " + strconv.Itoa(lastSeenID))
 	r, err := http.NewRequest("GET", target+"/rest/events?since="+strconv.Itoa(lastSeenID), nil)
 	res, err := performRequest(r)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
+	defer closeRequestResult(res)
 	if err != nil {
 		Warning.Println("Failed to perform request", err)
 		return nil, err
@@ -940,11 +932,7 @@ func waitForSync() {
 		Trace.Println("Waiting for Sync")
 		r, err := http.NewRequest("GET", target+"/rest/system/config/insync", nil)
 		res, err := performRequest(r)
-		defer func() {
-			if res != nil && res.Body != nil {
-				res.Body.Close()
-			}
-		}()
+		defer closeRequestResult(res)
 		if err != nil {
 			Warning.Println("Failed to perform request /rest/system/config/insync", err)
 			time.Sleep(configSyncTimeout)
