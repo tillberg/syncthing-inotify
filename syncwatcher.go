@@ -635,7 +635,13 @@ func accumulateChanges(debounceTimeout time.Duration,
 	currInterval := delayScanInterval                 // Timeout of the timer
 	askToDelayScan(folder, callback)
 	nextScanTime := time.Now().Add(delayScanInterval) // Time to remind Syncthing to delay scan
+	flushTimer := time.NewTimer(0)
+	flushTimerNeedsReset := true
 	for {
+		if flushTimerNeedsReset {
+			flushTimerNeedsReset = false
+			flushTimer.Reset(currInterval)
+		}
 		select {
 		case item := <-stInput:
 			if item.Path == "" {
@@ -657,7 +663,10 @@ func accumulateChanges(debounceTimeout time.Duration,
 			Debug.Println("[ST] Incoming: " + item.Path)
 			inProgress[item.Path] = progressTime{false, time.Now()}
 		case item := <-fsInput:
-			currInterval = debounceTimeout
+			if currInterval != debounceTimeout {
+				currInterval = debounceTimeout
+				flushTimerNeedsReset = true
+			}
 			Debug.Println("[FS] Incoming Changes for " + folder + ", speeding up inotify timeout parameters")
 			p, ok := inProgress[item]
 			if ok && !p.fsEvent {
@@ -672,7 +681,8 @@ func accumulateChanges(debounceTimeout time.Duration,
 			}
 			Debug.Println("[FS] Tracking: " + item)
 			inProgress[item] = progressTime{true, time.Now()}
-		case <-time.After(currInterval):
+		case <-flushTimer.C:
+			flushTimerNeedsReset = true
 			if delayScan > 0 && nextScanTime.Before(time.Now()) {
 				nextScanTime = time.Now().Add(delayScanInterval)
 				askToDelayScan(folder, callback)
