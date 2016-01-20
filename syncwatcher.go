@@ -646,7 +646,10 @@ func accumulateChanges(debounceTimeout time.Duration,
 		case item := <-stInput:
 			if item.Path == "" {
 				// Prepare for incoming changes
-				currInterval = debounceTimeout
+				if currInterval != debounceTimeout {
+					currInterval = debounceTimeout
+					flushTimerNeedsReset = true
+				}
 				Debug.Println("[ST] Incoming Changes for " + folder + ", speeding up inotify timeout parameters")
 				continue
 			}
