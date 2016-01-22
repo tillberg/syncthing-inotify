@@ -629,11 +629,21 @@ func accumulateChanges(debounceTimeout time.Duration,
 	stInput chan STEvent,
 	fsInput chan string,
 	callback InformCallback) func(string) {
-	delayScanInterval := time.Duration(delayScan-5) * time.Second
-	Debug.Printf("Delay scan reminder interval for %s set to %.0f seconds\n", folder, delayScanInterval.Seconds())
-	inProgress := make(map[string]progressTime)       // [path string]{fs, start}
-	currInterval := delayScanInterval                 // Timeout of the timer
-	askToDelayScan(folder, callback)
+	var delayScanInterval time.Duration
+	if delayScan > 0 {
+		delayScanInterval = time.Duration(delayScan-5) * time.Second
+		Debug.Printf("Delay scan reminder interval for %s set to %.0f seconds\n", folder, delayScanInterval.Seconds())
+	} else {
+		// If delayScan is set to 0, then we never send requests to delay full scans.
+		// "9999 * time.Hour" here is an approximation of "forever".
+		delayScanInterval = 9999 * time.Hour
+		Debug.Println("Delay scan reminders are disabled")
+	}
+	inProgress := make(map[string]progressTime) // [path string]{fs, start}
+	currInterval := delayScanInterval           // Timeout of the timer
+	if delayScan > 0 {
+		askToDelayScan(folder, callback)
+	}
 	nextScanTime := time.Now().Add(delayScanInterval) // Time to remind Syncthing to delay scan
 	flushTimer := time.NewTimer(0)
 	flushTimerNeedsReset := true
