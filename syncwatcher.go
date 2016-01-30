@@ -761,12 +761,18 @@ func accumulateChanges(debounceTimeout time.Duration,
 	}
 }
 
+func cleanPaths(paths []string) {
+	for i := range paths {
+		paths[i] = filepath.Clean(paths[i])
+	}
+}
+
 func sortedUniqueAndCleanPaths(paths []string) []string {
+	cleanPaths(paths)
 	sort.Strings(paths)
 	var new_paths []string
 	previousPath := ""
-	for i := range paths {
-		path := filepath.Clean(paths[i])
+	for _, path := range paths {
 		if path == "." {
 			path = ""
 		}
