@@ -761,6 +761,23 @@ func accumulateChanges(debounceTimeout time.Duration,
 	}
 }
 
+func sortedUniqueAndCleanPaths(paths []string) []string {
+	sort.Strings(paths)
+	var new_paths []string
+	previousPath := ""
+	for i := range paths {
+		path := filepath.Clean(paths[i])
+		if path == "." {
+			path = ""
+		}
+		if path != previousPath {
+			new_paths = append(new_paths, path)
+		}
+		previousPath = path
+	}
+	return new_paths
+}
+
 // AggregateChanges optimises tracking in two ways:
 // - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 // - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
@@ -770,19 +787,9 @@ func aggregateChanges(folderPath string, dirVsFiles int, paths []string) []strin
 	// Map of directories
 	trackedDirs := make(map[string]bool)
 	// Make sure parent paths are processed first
-	sort.Strings(paths)
-	// For removing duplicates in a sorted list
-	previousPath := ""
+	paths = sortedUniqueAndCleanPaths(paths)
 	// First we collect all paths and calculate scores for them
-	for i := range paths {
-		path := filepath.Clean(paths[i])
-		if path == "." {
-			path = ""
-		}
-		if path == previousPath {
-			continue
-		}
-		previousPath = path
+	for _, path := range paths {
 		fi, _ := os.Stat(path)
 		path = strings.TrimPrefix(path, folderPath)
 		path = strings.TrimPrefix(path, pathSeparator)
@@ -824,7 +831,7 @@ func aggregateChanges(folderPath string, dirVsFiles int, paths []string) []strin
 		keys = append(keys, k)
 	}
 	sort.Strings(keys) // Sort directories before their own files
-	previousPath = ""
+	previousPath := ""
 	var scans []string
 	// Decide if we should inform about particular path based on dirVsFiles
 	for i := range keys {
