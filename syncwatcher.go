@@ -731,7 +731,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 				}
 
 				// Try to inform changes to syncthing and if succeeded, clean up
-				err = callback(folder, aggregateChanges(folderPath, dirVsFiles, paths))
+				err = callback(folder, aggregateChanges(folderPath, dirVsFiles, paths, currentPathStatus))
 				if err == nil {
 					for _, path := range paths {
 						delete(inProgress, path)
@@ -784,10 +784,28 @@ func sortedUniqueAndCleanPaths(paths []string) []string {
 	return new_paths
 }
 
+type PathStatus int
+const (
+	deletedPath PathStatus = iota
+	directoryPath
+	filePath
+)
+
+func currentPathStatus(path string) PathStatus {
+	fileinfo, _ := os.Stat(path)
+	if fileinfo == nil {
+		return deletedPath
+	} else if fileinfo.IsDir() {
+		return directoryPath
+	}
+	return filePath
+}
+
+type statPathFunc func(name string) (PathStatus)
 // AggregateChanges optimises tracking in two ways:
 // - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 // - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
-func aggregateChanges(folderPath string, dirVsFiles int, paths []string) []string {
+func aggregateChanges(folderPath string, dirVsFiles int, paths []string, pathStatus statPathFunc) []string {
 	// Map paths to scores; if score == -1 the path is a filename
 	trackedPaths := make(map[string]int)
 	// Map of directories
@@ -796,16 +814,16 @@ func aggregateChanges(folderPath string, dirVsFiles int, paths []string) []strin
 	paths = sortedUniqueAndCleanPaths(paths)
 	// First we collect all paths and calculate scores for them
 	for _, path := range paths {
-		fi, _ := os.Stat(path)
+		pathstatus := pathStatus(path)
 		path = strings.TrimPrefix(path, folderPath)
 		path = strings.TrimPrefix(path, pathSeparator)
 		var dir string
-		if fi == nil {
+		if pathstatus == deletedPath {
 			// Definitely inform if the path does not exist anymore
 			dir = path
 			trackedPaths[path] = dirVsFiles
 			Debug.Println("[AG] Not found:", path)
-		} else if fi.IsDir() {
+		} else if pathstatus == directoryPath {
 			// Definitely inform if a directory changed
 			dir = path
 			trackedPaths[path] = dirVsFiles
