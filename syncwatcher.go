@@ -860,7 +860,7 @@ func aggregateChanges(folderPath string, dirVsFiles int, paths []string, pathSta
 	// Decide if we should inform about particular path based on dirVsFiles
 	for i := range keys {
 		trackedPath := keys[i]
-		trackedPathScore, _ := trackedPaths[trackedPath]
+		trackedPathScore := trackedPaths[trackedPath]
 		if strings.HasPrefix(trackedPath, previousPath+pathSeparator) {
 			// Already informed parent directory change
 			continue
