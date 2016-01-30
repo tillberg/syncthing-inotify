@@ -550,3 +550,53 @@ func TestManyDeletesAggregation(t *testing.T) {
 		t.Error("Callback not triggered")
 	}
 }
+
+func slicesEqual(left, right []string) bool {
+	if left == nil && right == nil {
+		return true;
+	}
+	if left == nil || right == nil {
+		return false;
+	}
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestAggregateChanges(t *testing.T) {
+	pathStat := func(path string) (PathStatus) {
+		if strings.Contains(path, "deleted") {
+			return deletedPath
+		} else if strings.Contains(path, "file") {
+			return filePath
+		} else {
+			return directoryPath
+		}
+	}
+	checkAggregation := func(dirVsFiles int, paths []string, expected []string) {
+		changes := aggregateChanges("/path/to/folder", dirVsFiles, paths, pathStat)
+		if !slicesEqual(changes, expected) {
+			t.Errorf("Expected: %#v, got: %#v", expected, changes)
+		}
+	}
+
+	checkAggregation(3, nil, nil)
+	checkAggregation(3, []string{}, nil)
+	checkAggregation(3, []string{"file1"}, []string{"file1"})
+	checkAggregation(3, []string{"a/file1"}, []string{"a/file1"})
+	checkAggregation(3, []string{"a/file1", "a/file2", "a/file3",
+		"b/file1", "b/file2"}, []string{"a", "b/file1", "b/file2"})
+	checkAggregation(3, []string{"a/deleted1", "a/deleted2", "a/deleted3", "a/deleted4",
+		"b/deleted1", "b/deleted2"}, []string{"a/deleted1", "a/deleted2", "a/deleted3",
+			"a/deleted4", "b/deleted1", "b/deleted2"})
+	checkAggregation(3, []string{"file1", "file2"}, []string{"file1", "file2"})
+	checkAggregation(3, []string{"file1", "file2", "file3", "file4"}, []string{""})
+	checkAggregation(3, []string{"file1", "file2", "file3", "file4",
+		"a/file1", "a/file2"}, []string{""})
+}
