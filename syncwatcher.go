@@ -731,7 +731,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 				}
 
 				// Try to inform changes to syncthing and if succeeded, clean up
-				err = callback(folder, aggregateChanges(folder, folderPath, dirVsFiles, paths))
+				err = callback(folder, aggregateChanges(folderPath, dirVsFiles, paths))
 				if err == nil {
 					for _, path := range paths {
 						delete(inProgress, path)
@@ -764,7 +764,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 // AggregateChanges optimises tracking in two ways:
 // - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 // - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
-func aggregateChanges(folder string, folderPath string, dirVsFiles int, paths []string) []string {
+func aggregateChanges(folderPath string, dirVsFiles int, paths []string) []string {
 	// Map paths to scores; if score == -1 the path is a filename
 	trackedPaths := make(map[string]int)
 	// Map of directories
