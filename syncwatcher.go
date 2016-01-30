@@ -731,7 +731,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 				}
 
 				// Try to inform changes to syncthing and if succeeded, clean up
-				err = aggregateChanges(folder, folderPath, dirVsFiles, callback, paths)
+				err = callback(folder, aggregateChanges(folder, folderPath, dirVsFiles, paths))
 				if err == nil {
 					for _, path := range paths {
 						delete(inProgress, path)
@@ -764,10 +764,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 // AggregateChanges optimises tracking in two ways:
 // - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 // - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
-func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback InformCallback, paths []string) error {
-	if len(paths) == 0 {
-		return errors.New("No changes to aggregate")
-	}
+func aggregateChanges(folder string, folderPath string, dirVsFiles int, paths []string) []string {
 	// Map paths to scores; if score == -1 the path is a filename
 	trackedPaths := make(map[string]int)
 	// Map of directories
@@ -849,7 +846,7 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 			break
 		}
 	}
-	return callback(folder, scans)
+	return scans
 }
 
 // watchSTEvents reads events from Syncthing. For events of type ItemStarted and ItemFinished it puts
