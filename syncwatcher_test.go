@@ -70,7 +70,7 @@ func TestDebouncedFileWatch(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != testFile {
-			t.Error("Invalid result for file change: "+repo, sub)
+			t.Errorf("Invalid result for file change: (%v) %#v", repo, sub)
 		}
 		testOK = true
 		return nil
@@ -99,7 +99,7 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != testFile {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		testOK = true
 		return nil
@@ -131,7 +131,7 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != "a" {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		testOK = true
 		return nil
@@ -168,10 +168,10 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 2 || sub[0] != "a" {
-			t.Error("Invalid result for directory change 1: "+repo, sub)
+			t.Errorf("Invalid result for directory change 1: (%v) %#v", repo, sub)
 		}
 		if repo != testRepo || sub[1] != "b" {
-			t.Error("Invalid result for directory change 2: "+repo, sub)
+			t.Errorf("Invalid result for directory change 2: (%v) %#v", repo, sub)
 		}
 		testOK = len(sub)
 		return nil
@@ -205,7 +205,7 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		}
 		for i, s := range sub {
 			if repo != testRepo || s != testFiles[i] {
-				t.Error("Invalid result for directory change " + strconv.Itoa(testOK) + ": " + repo + " " + s)
+				t.Errorf("Invalid result for directory change %t : (%v) %#v", testOK, repo, s)
 			}
 		}
 		testOK = len(sub)
@@ -242,10 +242,10 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 2 || sub[0] != "a"+slash+"b" {
-			t.Error("Invalid result for directory change "+strconv.Itoa(testOK)+": "+repo, sub)
+			t.Errorf("Invalid result for directory change %t : (%v) %#v", testOK, repo, sub)
 		}
 		if repo != testRepo || sub[1] != "a"+slash+"e" {
-			t.Error("Invalid result for directory change "+strconv.Itoa(testOK)+": "+repo, sub)
+			t.Errorf("Invalid result for directory change %t : (%v) %#v", testOK, repo, sub)
 		}
 		testOK = len(sub)
 		return nil
@@ -280,7 +280,7 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != "" {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		testOK = true
 		return nil
@@ -315,7 +315,7 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != strings.TrimSuffix(testChangeDir, slash) {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		testOK += 1
 		return nil
@@ -348,7 +348,7 @@ func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != "a" {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		testOK += 1
 		return nil
@@ -381,7 +381,7 @@ func TestSTEvents(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 0 {
-			t.Error("Invalid result for directory change: " + repo)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		testOK = false
 		return nil
@@ -418,7 +418,7 @@ func TestFilesAggregation(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 50 || sub[0] != "a/0" {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		if testOK {
 			t.Error("Callback triggered multiple times")
@@ -456,7 +456,7 @@ func TestManyFilesAggregation(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != "" {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		if testOK {
 			t.Error("Callback triggered multiple times")
@@ -494,7 +494,7 @@ func TestDeletesAggregation(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 50 || sub[0] != "a/0" {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		if testOK {
 			t.Error("Callback triggered multiple times")
@@ -531,7 +531,7 @@ func TestManyDeletesAggregation(t *testing.T) {
 			return nil
 		}
 		if repo != testRepo || len(sub) != 1 || sub[0] != "" {
-			t.Error("Invalid result for directory change: "+repo, sub)
+			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		if testOK {
 			t.Error("Callback triggered multiple times")
@@ -549,4 +549,54 @@ func TestManyDeletesAggregation(t *testing.T) {
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
+}
+
+func slicesEqual(left, right []string) bool {
+	if left == nil && right == nil {
+		return true;
+	}
+	if left == nil || right == nil {
+		return false;
+	}
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestAggregateChanges(t *testing.T) {
+	pathStat := func(path string) (PathStatus) {
+		if strings.Contains(path, "deleted") {
+			return deletedPath
+		} else if strings.Contains(path, "file") {
+			return filePath
+		} else {
+			return directoryPath
+		}
+	}
+	checkAggregation := func(dirVsFiles int, paths []string, expected []string) {
+		changes := aggregateChanges("/path/to/folder", dirVsFiles, paths, pathStat)
+		if !slicesEqual(changes, expected) {
+			t.Errorf("Expected: %#v, got: %#v", expected, changes)
+		}
+	}
+
+	checkAggregation(3, nil, nil)
+	checkAggregation(3, []string{}, nil)
+	checkAggregation(3, []string{"file1"}, []string{"file1"})
+	checkAggregation(3, []string{"a/file1"}, []string{"a/file1"})
+	checkAggregation(3, []string{"a/file1", "a/file2", "a/file3",
+		"b/file1", "b/file2"}, []string{"a", "b/file1", "b/file2"})
+	checkAggregation(3, []string{"a/deleted1", "a/deleted2", "a/deleted3", "a/deleted4",
+		"b/deleted1", "b/deleted2"}, []string{"a/deleted1", "a/deleted2", "a/deleted3",
+			"a/deleted4", "b/deleted1", "b/deleted2"})
+	checkAggregation(3, []string{"file1", "file2"}, []string{"file1", "file2"})
+	checkAggregation(3, []string{"file1", "file2", "file3", "file4"}, []string{""})
+	checkAggregation(3, []string{"file1", "file2", "file3", "file4",
+		"a/file1", "a/file2"}, []string{""})
 }

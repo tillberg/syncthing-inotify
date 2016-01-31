@@ -731,7 +731,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 				}
 
 				// Try to inform changes to syncthing and if succeeded, clean up
-				err = aggregateChanges(folder, folderPath, dirVsFiles, callback, paths)
+				err = callback(folder, aggregateChanges(folderPath, dirVsFiles, paths, currentPathStatus))
 				if err == nil {
 					for _, path := range paths {
 						delete(inProgress, path)
@@ -761,41 +761,69 @@ func accumulateChanges(debounceTimeout time.Duration,
 	}
 }
 
+func cleanPaths(paths []string) {
+	for i := range paths {
+		paths[i] = filepath.Clean(paths[i])
+	}
+}
+
+func sortedUniqueAndCleanPaths(paths []string) []string {
+	cleanPaths(paths)
+	sort.Strings(paths)
+	var new_paths []string
+	previousPath := ""
+	for _, path := range paths {
+		if path == "." {
+			path = ""
+		}
+		if path != previousPath {
+			new_paths = append(new_paths, path)
+		}
+		previousPath = path
+	}
+	return new_paths
+}
+
+type PathStatus int
+const (
+	deletedPath PathStatus = iota
+	directoryPath
+	filePath
+)
+
+func currentPathStatus(path string) PathStatus {
+	fileinfo, _ := os.Stat(path)
+	if fileinfo == nil {
+		return deletedPath
+	} else if fileinfo.IsDir() {
+		return directoryPath
+	}
+	return filePath
+}
+
+type statPathFunc func(name string) (PathStatus)
 // AggregateChanges optimises tracking in two ways:
 // - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 // - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
-func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback InformCallback, paths []string) error {
-	if len(paths) == 0 {
-		return errors.New("No changes to aggregate")
-	}
+func aggregateChanges(folderPath string, dirVsFiles int, paths []string, pathStatus statPathFunc) []string {
 	// Map paths to scores; if score == -1 the path is a filename
 	trackedPaths := make(map[string]int)
 	// Map of directories
 	trackedDirs := make(map[string]bool)
 	// Make sure parent paths are processed first
-	sort.Strings(paths)
-	// For removing duplicates in a sorted list
-	previousPath := ""
+	paths = sortedUniqueAndCleanPaths(paths)
 	// First we collect all paths and calculate scores for them
-	for i := range paths {
-		path := filepath.Clean(paths[i])
-		if path == "." {
-			path = ""
-		}
-		if path == previousPath {
-			continue
-		}
-		previousPath = path
-		fi, _ := os.Stat(path)
+	for _, path := range paths {
+		pathstatus := pathStatus(path)
 		path = strings.TrimPrefix(path, folderPath)
 		path = strings.TrimPrefix(path, pathSeparator)
 		var dir string
-		if fi == nil {
+		if pathstatus == deletedPath {
 			// Definitely inform if the path does not exist anymore
 			dir = path
 			trackedPaths[path] = dirVsFiles
 			Debug.Println("[AG] Not found:", path)
-		} else if fi.IsDir() {
+		} else if pathstatus == directoryPath {
 			// Definitely inform if a directory changed
 			dir = path
 			trackedPaths[path] = dirVsFiles
@@ -827,12 +855,12 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 		keys = append(keys, k)
 	}
 	sort.Strings(keys) // Sort directories before their own files
-	previousPath = ""
+	previousPath := ""
 	var scans []string
 	// Decide if we should inform about particular path based on dirVsFiles
 	for i := range keys {
 		trackedPath := keys[i]
-		trackedPathScore, _ := trackedPaths[trackedPath]
+		trackedPathScore := trackedPaths[trackedPath]
 		if strings.HasPrefix(trackedPath, previousPath+pathSeparator) {
 			// Already informed parent directory change
 			continue
@@ -849,7 +877,7 @@ func aggregateChanges(folder string, folderPath string, dirVsFiles int, callback
 			break
 		}
 	}
-	return callback(folder, scans)
+	return scans
 }
 
 // watchSTEvents reads events from Syncthing. For events of type ItemStarted and ItemFinished it puts
