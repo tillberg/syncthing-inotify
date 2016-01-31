@@ -306,6 +306,15 @@ func restart() bool {
 
 // filterFolders refines folders list using global vars watchFolders and skipFolders
 func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
+	var fs []FolderConfiguration
+	for _, f := range folders {
+		if f.ReadOnly {
+			Debug.Println("Skipping read-only folder " + f.ID)
+			continue
+		}
+		fs = append(fs, f)
+	}
+	folders = fs
 	if len(watchFolders) > 0 {
 		var fs []FolderConfiguration
 		for _, f := range folders {
