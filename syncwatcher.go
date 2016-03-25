@@ -723,11 +723,11 @@ func accumulateChanges(debounceTimeout time.Duration,
 			if len(inProgress) < maxFiles {
 				for path, progress := range inProgress {
 					// Clean up invalid and expired paths
-					if path == "" || progress.time.Before(expiry) {
+					if path == "" || (!progress.fsEvent && progress.time.Before(expiry)) {
 						delete(inProgress, path)
 						continue
 					}
-					if progress.fsEvent {
+					if (progress.fsEvent && time.Now().Sub(progress.time) > currInterval) {
 						paths = append(paths, path)
 						Debug.Println("Informing about " + path)
 					} else {
