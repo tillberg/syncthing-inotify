@@ -432,7 +432,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 			Warning.Println(msg, err)
 			informError(msg)
 		} else {
-			Warning.Println("Failed to install inotify handlers", err)
+			Warning.Println("Failed to install inotify handler for " + folder.ID + ".", err)
 			informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
 		}
 		return
