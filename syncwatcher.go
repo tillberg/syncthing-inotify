@@ -124,6 +124,7 @@ var (
 var (
 	stop         = make(chan int)
 	ignorePaths  = []string{".stversions", ".syncthing.", "~syncthing~"}
+	logFd        = os.Stdout
 	Version      = "unknown-dev"
 	Discard      = log.New(ioutil.Discard, "", log.Ldate)
 	Warning      = Discard // verbosity=1
@@ -162,12 +163,14 @@ func init() {
 		}
 	}
 
+	var logFile string
 	var verbosity int
 	var logflags int
 	var home string
 	var apiKeyStdin bool
 	var authPassStdin bool
 	var showVersion bool
+	flag.StringVar(&logFile, "logfile", "", "Log file")
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
 	flag.IntVar(&logflags, "logflags", 2, "Select information in log line prefix")
 	flag.StringVar(&home, "home", home, "Specify the home Syncthing dir to sniff configuration settings")
@@ -191,17 +194,25 @@ func init() {
 		os.Exit(0)
 	}
 
+	if len(logFile) > 0 {
+		var err error
+		logFd, err = os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+
 	if verbosity >= 1 {
-		Warning = log.New(os.Stdout, "[WARNING] ", logflags)
+		Warning = log.New(logFd, "[WARNING] ", logflags)
 	}
 	if verbosity >= 2 {
-		OK = log.New(os.Stdout, "[OK] ", logflags)
+		OK = log.New(logFd, "[OK] ", logflags)
 	}
 	if verbosity >= 3 {
-		Trace = log.New(os.Stdout, "[TRACE] ", logflags)
+		Trace = log.New(logFd, "[TRACE] ", logflags)
 	}
 	if verbosity >= 4 {
-		Debug = log.New(os.Stdout, "[DEBUG] ", logflags)
+		Debug = log.New(logFd, "[DEBUG] ", logflags)
 	}
 
 	if len(home) > 0 {
