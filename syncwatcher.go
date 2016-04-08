@@ -163,6 +163,7 @@ func init() {
 		}
 	}
 
+	var accumulationInterval int
 	var logFile string
 	var verbosity int
 	var logflags int
@@ -170,6 +171,8 @@ func init() {
 	var apiKeyStdin bool
 	var authPassStdin bool
 	var showVersion bool
+	flag.IntVar(&accumulationInterval, "interval", 500,
+		"Accumulation interval in milliseconds")
 	flag.StringVar(&logFile, "logfile", "", "Log file")
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
 	flag.IntVar(&logflags, "logflags", 2, "Select information in log line prefix")
@@ -192,6 +195,11 @@ func init() {
 	if showVersion {
 		fmt.Printf("syncthing-inotify %s (%s %s-%s)\n", Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
+	}
+
+	if accumulationInterval != 500 {
+		debounceTimeout = time.Duration(accumulationInterval) *
+			time.Millisecond
 	}
 
 	if len(logFile) > 0 {
