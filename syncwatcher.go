@@ -197,10 +197,7 @@ func init() {
 		os.Exit(0)
 	}
 
-	if accumulationInterval != 500 {
-		debounceTimeout = time.Duration(accumulationInterval) *
-			time.Millisecond
-	}
+	debounceTimeout = time.Duration(accumulationInterval) *	time.Millisecond
 
 	if len(logFile) > 0 {
 		var err error
