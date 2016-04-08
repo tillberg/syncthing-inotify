@@ -442,11 +442,21 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 			msg := "Failed to install inotify handler for " + folder.ID + ". Please increase inotify limits, see http://bit.ly/1PxkdUC for more information."
 			Warning.Println(msg, err)
 			informError(msg)
+			return
+		} else if strings.Contains(err.Error(), "error while traversing") {
+			re, _ := regexp.Compile("\"(/.+)\":")
+			errPath := re.FindStringSubmatch(err.Error())[1]
+			relErrPath := relativePath(errPath, folderPath)
+			if !shouldIgnore(ignorePaths, ignorePatterns, relErrPath) {
+				Warning.Println("Failed to install inotify handler for " + folder.ID + ".", err)
+				informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
+				return
+			}
 		} else {
 			Warning.Println("Failed to install inotify handler for " + folder.ID + ".", err)
 			informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
+			return
 		}
-		return
 	}
 	defer notify.Stop(c)
 	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
