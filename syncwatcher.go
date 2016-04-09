@@ -170,6 +170,8 @@ func init() {
 	var apiKeyStdin bool
 	var authPassStdin bool
 	var showVersion bool
+	flag.DurationVar(&debounceTimeout, "interval", debounceTimeout,
+		"Accumulation interval, e.g. 5s or 1m")
 	flag.StringVar(&logFile, "logfile", "", "Log file")
 	flag.IntVar(&verbosity, "verbosity", 2, "Logging level [1..4]")
 	flag.IntVar(&logflags, "logflags", 2, "Select information in log line prefix")
