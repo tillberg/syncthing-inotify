@@ -21,7 +21,7 @@ CreateObject("Wscript.Shell").Run "syncthing-inotify.exe -api=""...""", 0, True
   * Install as a service, see the etc/ folder
 
 #### I'm confused
-  * Try [Syncthing-GTK](https://github.com/syncthing/syncthing-gtk)
+  * Try [Syncthing-GTK](https://github.com/syncthing/syncthing-gtk), [QSyncthingTray](https://github.com/sieren/QSyncthingTray/releases) (both cross-platform) or [SyncTrayzor](https://github.com/canton7/SyncTrayzor/releases) (Windows only).
   * Read the commandline options: ```./syncthing-inotify -help```. Settings, such as an API key, need to be manually provided if you use a custom home for Syncthing.
 
 #### Building syncthing-inotify
