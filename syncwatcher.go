@@ -505,10 +505,10 @@ func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) b
 			return true
 		}
 	}
-	for _, p1 := range ignorePatterns {
+	for iter, p1 := range ignorePatterns {
 		if p1.include && p1.match.MatchString(path) {
 			keep := false
-			for _, p2 := range ignorePatterns {
+			for _, p2 := range ignorePatterns[:iter] {
 				if !p2.include && p2.match.MatchString(path) {
 					Debug.Println("Keeping", path, "because", p2.match.String())
 					keep = true
