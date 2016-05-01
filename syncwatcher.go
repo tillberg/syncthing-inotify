@@ -423,6 +423,16 @@ func getFolders() []FolderConfiguration {
 	return cfg.Folders
 }
 
+// returns a function that takes a path as string and returns a boolean,
+// indicating whether the path should be ignored
+func ignoreTest(ignorePaths []string, ignorePatterns []Pattern,
+	folderPath string) func(string) bool {
+	return func(path string) bool {
+		relPath := relativePath(path, folderPath)
+		return shouldIgnore(ignorePaths, ignorePatterns, relPath)
+	}
+}
+
 // watchFolder installs inotify watcher for a folder, launches
 // goroutine which receives changed items. It never exits.
 func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
@@ -430,21 +440,14 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	ignorePatterns := getIgnorePatterns(folder.ID)
 	fsInput := make(chan string)
 	c := make(chan notify.EventInfo, maxFiles)
-	if err := notify.Watch(filepath.Join(folderPath, "..."), c, notify.All); err != nil {
+	notify.SetIgnoreTest(ignoreTest(ignorePaths, ignorePatterns, folderPath))
+	if err := notify.Watch(filepath.Join(folderPath, "..."), c,
+		notify.All); err != nil {
 		if strings.Contains(err.Error(), "too many open files") || strings.Contains(err.Error(), "no space left on device") {
 			msg := "Failed to install inotify handler for " + folder.ID + ". Please increase inotify limits, see http://bit.ly/1PxkdUC for more information."
 			Warning.Println(msg, err)
 			informError(msg)
 			return
-		} else if strings.Contains(err.Error(), "error while traversing") {
-			re, _ := regexp.Compile("\"(/.+)\":")
-			errPath := re.FindStringSubmatch(err.Error())[1]
-			relErrPath := relativePath(errPath, folderPath)
-			if !shouldIgnore(ignorePaths, ignorePatterns, relErrPath) {
-				Warning.Println("Failed to install inotify handler for " + folder.ID + ".", err)
-				informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
-				return
-			}
 		} else {
 			Warning.Println("Failed to install inotify handler for " + folder.ID + ".", err)
 			informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
