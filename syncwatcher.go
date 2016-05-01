@@ -440,7 +440,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	ignorePatterns := getIgnorePatterns(folder.ID)
 	fsInput := make(chan string)
 	c := make(chan notify.EventInfo, maxFiles)
-	notify.SetIgnoreTest(ignoreTest(ignorePaths, ignorePatterns, folderPath))
+	notify.SetDoNotWatch(ignoreTest(ignorePaths, ignorePatterns, folderPath))
 	if err := notify.Watch(filepath.Join(folderPath, "..."), c,
 		notify.All); err != nil {
 		if strings.Contains(err.Error(), "too many open files") || strings.Contains(err.Error(), "no space left on device") {
