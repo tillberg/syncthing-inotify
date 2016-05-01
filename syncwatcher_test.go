@@ -61,7 +61,7 @@ func TestDebouncedFileWatch(t *testing.T) {
 	testFiles := createTestPaths(t,
 		testFile)
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -90,7 +90,7 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 	testOK := false
 	testRepo := "test1"
 	testFile := createTestPath(t, "a"+slash)
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -122,7 +122,7 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 		testChangeDir+"file2",
 		testChangeDir+"file3.ogg")
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 2
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -159,7 +159,7 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 		testChangeDir2,
 		testChangeDir1+"file3.ogg")
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -195,7 +195,7 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		"a"+slash+"c"+slash+"file2",
 		"a"+slash+"d"+slash+"file3.ogg")
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -233,7 +233,7 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 		"a"+slash+"b"+slash+"file3.ogg",
 		"a"+slash+"b"+slash+"c"+slash+"file4")
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -271,7 +271,7 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 		"file2",
 		"file3")
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -306,7 +306,7 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 		testChangeDir+"file2",
 		testChangeDir+"file3.ogg")
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -339,7 +339,7 @@ func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
 		"a"+slash+"b"+slash,
 		"a"+slash+"b"+slash+"file1.txt")
 	clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -372,7 +372,7 @@ func TestSTEvents(t *testing.T) {
 		"file2",
 		"file3")
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -408,7 +408,7 @@ func TestFilesAggregation(t *testing.T) {
 		testFiles[i] = createTestPath(t, "a"+slash+strconv.Itoa(i))
 	}
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := nrFiles + 1
 	stop := make(chan int, 1)
 	stChan := make(chan STEvent, nrFiles)
@@ -446,7 +446,7 @@ func TestManyFilesAggregation(t *testing.T) {
 		testFiles[i] = createTestPath(t, "a"+slash+strconv.Itoa(i))
 	}
 	defer clearTestDir()
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stop := make(chan int, 1)
 	stChan := make(chan STEvent, nrFiles)
@@ -484,7 +484,7 @@ func TestDeletesAggregation(t *testing.T) {
 	for i := 0; i < nrFiles; i++ {
 		testFiles[i] = "a" + slash + strconv.Itoa(i)
 	}
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stop := make(chan int, 1)
 	stChan := make(chan STEvent, nrFiles)
@@ -521,7 +521,7 @@ func TestManyDeletesAggregation(t *testing.T) {
 	for i := 0; i < nrFiles; i++ {
 		testFiles[i] = "a" + slash + strconv.Itoa(i)
 	}
-	testDebounceTimeout := 20 * time.Millisecond
+	testDebounceTimeout := 50 * time.Millisecond
 	testDirVsFiles := 10
 	stop := make(chan int, 1)
 	stChan := make(chan STEvent, nrFiles)
@@ -553,10 +553,10 @@ func TestManyDeletesAggregation(t *testing.T) {
 
 func slicesEqual(left, right []string) bool {
 	if left == nil && right == nil {
-		return true;
+		return true
 	}
 	if left == nil || right == nil {
-		return false;
+		return false
 	}
 	if len(left) != len(right) {
 		return false
@@ -570,7 +570,7 @@ func slicesEqual(left, right []string) bool {
 }
 
 func TestAggregateChanges(t *testing.T) {
-	pathStat := func(path string) (PathStatus) {
+	pathStat := func(path string) PathStatus {
 		if strings.Contains(path, "deleted") {
 			return deletedPath
 		} else if strings.Contains(path, "file") {
@@ -594,7 +594,7 @@ func TestAggregateChanges(t *testing.T) {
 		"b/file1", "b/file2"}, []string{"a", "b/file1", "b/file2"})
 	checkAggregation(3, []string{"a/deleted1", "a/deleted2", "a/deleted3", "a/deleted4",
 		"b/deleted1", "b/deleted2"}, []string{"a/deleted1", "a/deleted2", "a/deleted3",
-			"a/deleted4", "b/deleted1", "b/deleted2"})
+		"a/deleted4", "b/deleted1", "b/deleted2"})
 	checkAggregation(3, []string{"file1", "file2"}, []string{"file1", "file2"})
 	checkAggregation(3, []string{"file1", "file2", "file3", "file4"}, []string{""})
 	checkAggregation(3, []string{"file1", "file2", "file3", "file4",

@@ -449,7 +449,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 			informError(msg)
 			return
 		} else {
-			Warning.Println("Failed to install inotify handler for " + folder.ID + ".", err)
+			Warning.Println("Failed to install inotify handler for "+folder.ID+".", err)
 			informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
 			return
 		}
@@ -744,7 +744,7 @@ func accumulateChanges(debounceTimeout time.Duration,
 						delete(inProgress, path)
 						continue
 					}
-					if (progress.fsEvent && time.Now().Sub(progress.time) > currInterval) {
+					if progress.fsEvent && time.Now().Sub(progress.time) > currInterval {
 						paths = append(paths, path)
 						Debug.Println("Informing about " + path)
 					} else {
@@ -811,6 +811,7 @@ func sortedUniqueAndCleanPaths(paths []string) []string {
 }
 
 type PathStatus int
+
 const (
 	deletedPath PathStatus = iota
 	directoryPath
@@ -827,7 +828,8 @@ func currentPathStatus(path string) PathStatus {
 	return filePath
 }
 
-type statPathFunc func(name string) (PathStatus)
+type statPathFunc func(name string) PathStatus
+
 // AggregateChanges optimises tracking in two ways:
 // - If there are more than `dirVsFiles` changes in a directory, we inform Syncthing to scan the entire directory
 // - Directories with parent directory changes are aggregated. If A/B has 3 changes and A/C has 8, A will have 11 changes and if this is bigger than dirVsFiles we will scan A.
