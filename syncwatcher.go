@@ -40,7 +40,6 @@ type Configuration struct {
 type FolderConfiguration struct {
 	ID              string
 	Path            string
-	ReadOnly        bool
 	RescanIntervalS int
 }
 
