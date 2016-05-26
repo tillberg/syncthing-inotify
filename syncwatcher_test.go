@@ -417,7 +417,7 @@ func TestFilesAggregation(t *testing.T) {
 		if len(sub) == 1 && sub[0] == ".stfolder" {
 			return nil
 		}
-		if repo != testRepo || len(sub) != 50 || sub[0] != "a/0" {
+		if repo != testRepo || len(sub) != 50 || sub[0] != "a"+slash+"0" {
 			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		if testOK {
@@ -493,7 +493,7 @@ func TestDeletesAggregation(t *testing.T) {
 		if len(sub) == 1 && sub[0] == ".stfolder" {
 			return nil
 		}
-		if repo != testRepo || len(sub) != 50 || sub[0] != "a/0" {
+		if repo != testRepo || len(sub) != 50 || sub[0] != "a"+slash+"0" {
 			t.Errorf("Invalid result for directory change: (%v) %#v", repo, sub)
 		}
 		if testOK {
@@ -589,14 +589,14 @@ func TestAggregateChanges(t *testing.T) {
 	checkAggregation(3, nil, nil)
 	checkAggregation(3, []string{}, nil)
 	checkAggregation(3, []string{"file1"}, []string{"file1"})
-	checkAggregation(3, []string{"a/file1"}, []string{"a/file1"})
-	checkAggregation(3, []string{"a/file1", "a/file2", "a/file3",
-		"b/file1", "b/file2"}, []string{"a", "b/file1", "b/file2"})
-	checkAggregation(3, []string{"a/deleted1", "a/deleted2", "a/deleted3", "a/deleted4",
-		"b/deleted1", "b/deleted2"}, []string{"a/deleted1", "a/deleted2", "a/deleted3",
-		"a/deleted4", "b/deleted1", "b/deleted2"})
+	checkAggregation(3, []string{"a"+slash+"file1"}, []string{"a"+slash+"file1"})
+	checkAggregation(3, []string{"a"+slash+"file1", "a"+slash+"file2", "a"+slash+"file3",
+		"b"+slash+"file1", "b"+slash+"file2"}, []string{"a", "b"+slash+"file1", "b"+slash+"file2"})
+	checkAggregation(3, []string{"a"+slash+"deleted1", "a"+slash+"deleted2", "a"+slash+"deleted3", "a"+slash+"deleted4",
+		"b"+slash+"deleted1", "b"+slash+"deleted2"}, []string{"a"+slash+"deleted1", "a"+slash+"deleted2", "a"+slash+"deleted3",
+		"a"+slash+"deleted4", "b"+slash+"deleted1", "b"+slash+"deleted2"})
 	checkAggregation(3, []string{"file1", "file2"}, []string{"file1", "file2"})
 	checkAggregation(3, []string{"file1", "file2", "file3", "file4"}, []string{""})
 	checkAggregation(3, []string{"file1", "file2", "file3", "file4",
-		"a/file1", "a/file2"}, []string{""})
+		"a"+slash+"file1", "a"+slash+"file2"}, []string{""})
 }
