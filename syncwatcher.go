@@ -28,6 +28,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/zillode/notify"
+	"github.com/syncthing/syncthing/lib/ignore"
 )
 
 // Configuration is used in parsing response from ST
@@ -355,49 +356,6 @@ func closeRequestResult(result *http.Response) {
 	}
 }
 
-// getIgnorePatterns retrieves the list of ignored patterns for a folder from Syncthing.
-// It blocks until ST responds with success.
-func getIgnorePatterns(folder string) []Pattern {
-	for {
-		Trace.Println("Getting ignore patterns for " + folder)
-		r, err := http.NewRequest("GET", target+"/rest/db/ignores?folder="+url.QueryEscape(folder), nil)
-		res, err := performRequest(r)
-		defer closeRequestResult(res)
-		if err != nil {
-			Warning.Println("Failed to perform request /rest/db/ignores?folder="+url.QueryEscape(folder), err)
-			time.Sleep(configSyncTimeout)
-			continue
-		}
-		if res.StatusCode == 500 {
-			Warning.Println("Syncthing not ready in " + folder + " for /rest/db/ignores")
-			time.Sleep(configSyncTimeout)
-			continue
-		}
-		if res.StatusCode != 200 {
-			log.Fatalf("Status %d != 200 for GET /rest/db/ignores?folder=%s: %v\n", res.StatusCode, folder, res)
-		}
-		bs, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		var ignores map[string][]string
-		err = json.Unmarshal(bs, &ignores)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		patterns := make([]Pattern, len(ignores["patterns"]))
-		for i, str := range ignores["patterns"] {
-			pattern := strings.TrimPrefix(str, "(?exclude)")
-			regexp, err := regexp.Compile(pattern)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			patterns[i] = Pattern{regexp, str == pattern}
-		}
-		return patterns
-	}
-}
-
 // getFolders returns the list of folders configured in Syncthing. Blocks until ST responded successfully.
 func getFolders() []FolderConfiguration {
 	Trace.Println("Getting Folders")
@@ -422,26 +380,21 @@ func getFolders() []FolderConfiguration {
 	return cfg.Folders
 }
 
-// returns a function that takes a path as string and returns a boolean,
-// indicating whether the path should be ignored
-func ignoreTest(ignorePaths []string, ignorePatterns []Pattern,
-	folderPath string) func(string) bool {
-	return func(path string) bool {
-		relPath := relativePath(path, folderPath)
-		return shouldIgnore(ignorePaths, ignorePatterns, relPath)
-	}
-}
-
 // watchFolder installs inotify watcher for a folder, launches
 // goroutine which receives changed items. It never exits.
 func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	folderPath := expandTilde(folder.Path)
-	ignorePatterns := getIgnorePatterns(folder.ID)
+	ignores := ignore.New(false)
+	Trace.Println("Getting ignore patterns for " + folder.ID)
+	ignores.Load(filepath.Join(folderPath, ".stignore"))
 	fsInput := make(chan string)
 	c := make(chan notify.EventInfo, maxFiles)
-	notify.SetDoNotWatch(ignoreTest(ignorePaths, ignorePatterns, folderPath))
-	if err := notify.Watch(filepath.Join(folderPath, "..."), c,
-		notify.All); err != nil {
+	ignoreTest := func(absolutePath string) bool {
+		relPath := relativePath(absolutePath, folderPath)
+		return ignores.Match(relPath).IsIgnored()
+	}
+	notify.SetDoNotWatch(ignoreTest)
+	if err := notify.Watch(filepath.Join(folderPath, "..."), c, notify.All); err != nil {
 		if strings.Contains(err.Error(), "too many open files") || strings.Contains(err.Error(), "no space left on device") {
 			msg := "Failed to install inotify handler for " + folder.ID + ". Please increase inotify limits, see http://bit.ly/1PxkdUC for more information."
 			Warning.Println(msg, err)
@@ -461,14 +414,15 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	}
 	// will we ever get out of this loop?
 	for {
-		evPath := waitForEvent(c)
-		Debug.Println("Change detected in: " + evPath + " (could still be ignored)")
-		ev := relativePath(evPath, folderPath)
-		if shouldIgnore(ignorePaths, ignorePatterns, ev) {
+		evAbsolutePath := waitForEvent(c)
+		Debug.Println("Change detected in: " + evAbsolutePath + " (could still be ignored)")
+		evRelPath := relativePath(evAbsolutePath, folderPath)
+		if ignores.Match(evRelPath).IsIgnored() {
+			Debug.Println("Ignoring", evAbsolutePath)
 			continue
 		}
-		Trace.Println("Change detected in: " + evPath)
-		fsInput <- ev
+		Trace.Println("Change detected in: " + evAbsolutePath)
+		fsInput <- evRelPath
 	}
 }
 
@@ -494,36 +448,6 @@ func waitForEvent(c chan notify.EventInfo) string {
 		}
 		return ev.Path()
 	}
-}
-
-// shouldIgnore determines if path should be ignored using ignorePaths and ignorePatterns
-func shouldIgnore(ignorePaths []string, ignorePatterns []Pattern, path string) bool {
-	if len(path) == 0 {
-		return false
-	}
-	for _, ignorePath := range ignorePaths {
-		if strings.Contains(path, ignorePath) {
-			Debug.Println("Ignoring", path)
-			return true
-		}
-	}
-	for iter, p1 := range ignorePatterns {
-		if p1.include && p1.match.MatchString(path) {
-			keep := false
-			for _, p2 := range ignorePatterns[:iter] {
-				if !p2.include && p2.match.MatchString(path) {
-					Debug.Println("Keeping", path, "because", p2.match.String())
-					keep = true
-					break
-				}
-			}
-			if !keep {
-				Debug.Println("Ignoring", path)
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func prepareApiRequestForSyncthing(request *http.Request) (*http.Request, error) {
