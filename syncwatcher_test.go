@@ -61,7 +61,7 @@ func TestDebouncedFileWatch(t *testing.T) {
 	testFiles := createTestPaths(t,
 		testFile)
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -75,11 +75,11 @@ func TestDebouncedFileWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
@@ -90,7 +90,7 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 	testOK := false
 	testRepo := "test1"
 	testFile := createTestPath(t, "a"+slash)
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -104,9 +104,9 @@ func TestDebouncedDirectoryWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	fsChan <- testDirectory + testFile
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
@@ -122,7 +122,7 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 		testChangeDir+"file2",
 		testChangeDir+"file3.ogg")
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 2
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -136,11 +136,11 @@ func TestDebouncedParentDirectoryWatch(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
@@ -159,7 +159,7 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 		testChangeDir2,
 		testChangeDir1+"file3.ogg")
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -176,11 +176,11 @@ func TestDebouncedParentDirectoryWatch2(t *testing.T) {
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if testOK != 2 {
 		t.Error("Callback not correctly triggered")
 	}
@@ -195,7 +195,7 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		"a"+slash+"c"+slash+"file2",
 		"a"+slash+"d"+slash+"file3.ogg")
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -211,11 +211,11 @@ func TestDebouncedParentDirectoryWatch3(t *testing.T) {
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if testOK != 3 {
 		t.Error("Callback not correctly triggered")
 	}
@@ -233,7 +233,7 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 		"a"+slash+"b"+slash+"file3.ogg",
 		"a"+slash+"b"+slash+"c"+slash+"file4")
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -250,11 +250,11 @@ func TestDebouncedParentDirectoryWatch4(t *testing.T) {
 		testOK = len(sub)
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if testOK != 2 {
 		t.Error("Callback not correctly triggered")
 	}
@@ -271,7 +271,7 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 		"file2",
 		"file3")
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 3
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -285,11 +285,11 @@ func TestDebouncedParentDirectoryWatch5(t *testing.T) {
 		testOK = true
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not correctly triggered")
 	}
@@ -306,7 +306,7 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 		testChangeDir+"file2",
 		testChangeDir+"file3.ogg")
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -320,11 +320,11 @@ func TestDebouncedParentDirectoryWatch6(t *testing.T) {
 		testOK += 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if testOK != 1 {
 		t.Error("Callback not correctly triggered")
 	}
@@ -339,7 +339,7 @@ func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
 		"a"+slash+"b"+slash,
 		"a"+slash+"b"+slash+"file1.txt")
 	clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -353,11 +353,11 @@ func TestDebouncedParentDirectoryRemovedWatch(t *testing.T) {
 		testOK += 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for i := range testFiles {
 		fsChan <- testDirectory + testFiles[i]
 	}
-	time.Sleep(testDebounceTimeout * 10)
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
+	time.Sleep(testDebounceTimeout * 50)
 	if testOK != 1 {
 		t.Error("Callback not correctly triggered")
 	}
@@ -372,7 +372,7 @@ func TestSTEvents(t *testing.T) {
 		"file2",
 		"file3")
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stChan := make(chan STEvent, 10)
 	fsChan := make(chan string, 10)
@@ -386,13 +386,13 @@ func TestSTEvents(t *testing.T) {
 		testOK = false
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	stChan <- STEvent{Path: ""}
 	for i := range testFiles {
 		stChan <- STEvent{Path: testDirectory + testFiles[i], Finished: false}
 		fsChan <- testDirectory + testFiles[i]
 		stChan <- STEvent{Path: testDirectory + testFiles[i], Finished: true}
 	}
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not correctly triggered")
@@ -408,7 +408,7 @@ func TestFilesAggregation(t *testing.T) {
 		testFiles[i] = createTestPath(t, "a"+slash+strconv.Itoa(i))
 	}
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := nrFiles + 1
 	stop := make(chan int, 1)
 	stChan := make(chan STEvent, nrFiles)
@@ -424,15 +424,15 @@ func TestFilesAggregation(t *testing.T) {
 			t.Error("Callback triggered multiple times")
 		}
 		testOK = true
-		close(stop)
+		stop <- 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for _, testFile := range testFiles {
 		fsChan <- testDirectory + testFile
 	}
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	<-stop
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
@@ -446,7 +446,7 @@ func TestManyFilesAggregation(t *testing.T) {
 		testFiles[i] = createTestPath(t, "a"+slash+strconv.Itoa(i))
 	}
 	defer clearTestDir()
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stop := make(chan int, 1)
 	stChan := make(chan STEvent, nrFiles)
@@ -462,15 +462,15 @@ func TestManyFilesAggregation(t *testing.T) {
 			t.Error("Callback triggered multiple times")
 		}
 		testOK = true
-		close(stop)
+		stop <- 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for _, testFile := range testFiles {
 		fsChan <- testDirectory + testFile
 	}
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	<-stop
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
@@ -484,7 +484,7 @@ func TestDeletesAggregation(t *testing.T) {
 	for i := 0; i < nrFiles; i++ {
 		testFiles[i] = "a" + slash + strconv.Itoa(i)
 	}
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stop := make(chan int, 1)
 	stChan := make(chan STEvent, nrFiles)
@@ -500,19 +500,20 @@ func TestDeletesAggregation(t *testing.T) {
 			t.Error("Callback triggered multiple times")
 		}
 		testOK = true
-		close(stop)
+		stop <- 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for _, testFile := range testFiles {
 		fsChan <- testDirectory + testFile
 	}
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	<-stop
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
 }
+
 func TestManyDeletesAggregation(t *testing.T) {
 	nrFiles := 5000
 	testOK := false
@@ -521,7 +522,7 @@ func TestManyDeletesAggregation(t *testing.T) {
 	for i := 0; i < nrFiles; i++ {
 		testFiles[i] = "a" + slash + strconv.Itoa(i)
 	}
-	testDebounceTimeout := 50 * time.Millisecond
+	testDebounceTimeout := 100 * time.Millisecond
 	testDirVsFiles := 10
 	stop := make(chan int, 1)
 	stChan := make(chan STEvent, nrFiles)
@@ -537,15 +538,15 @@ func TestManyDeletesAggregation(t *testing.T) {
 			t.Error("Callback triggered multiple times")
 		}
 		testOK = true
-		close(stop)
+		stop <- 1
 		return nil
 	}
-	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	for _, testFile := range testFiles {
 		fsChan <- testDirectory + testFile
 	}
+	go accumulateChanges(testDebounceTimeout, testRepo, testDirectory, testDirVsFiles, stChan, fsChan, fileChange)
 	<-stop
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(testDebounceTimeout * 50)
 	if !testOK {
 		t.Error("Callback not triggered")
 	}
