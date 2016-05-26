@@ -427,6 +427,7 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 }
 
 func relativePath(path string, folderPath string) string {
+	path = expandTilde(path);
 	path = strings.TrimPrefix(path, folderPath)
 	if len(path) == 0 {
 		return path
