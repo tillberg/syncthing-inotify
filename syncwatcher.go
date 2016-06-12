@@ -40,6 +40,7 @@ type Configuration struct {
 // FolderConfiguration holds information about shared folder in ST
 type FolderConfiguration struct {
 	ID              string
+	Label           string
 	Path            string
 	RescanIntervalS int
 }
@@ -278,7 +279,7 @@ func main() {
 	}
 	stChans := make(map[string]chan STEvent, len(folders))
 	for _, folder := range folders {
-		Debug.Println("Installing watch for " + folder.ID)
+		Debug.Println("Installing watch for " + folder.Label)
 		stChan := make(chan STEvent)
 		stChans[folder.ID] = stChan
 		go watchFolder(folder, stChan)
@@ -377,7 +378,14 @@ func getFolders() []FolderConfiguration {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	return cfg.Folders
+	// Use folder label unless it's empty
+	folders := cfg.Folders;
+	for f := range folders {
+		if len(folders[f].Label) == 0 {
+			folders[f].Label = folders[f].ID;
+		}
+	}
+	return folders;
 }
 
 // watchFolder installs inotify watcher for a folder, launches
@@ -385,7 +393,7 @@ func getFolders() []FolderConfiguration {
 func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	folderPath := expandTilde(folder.Path)
 	ignores := ignore.New(false)
-	Trace.Println("Getting ignore patterns for " + folder.ID)
+	Trace.Println("Getting ignore patterns for " + folder.Label)
 	ignores.Load(filepath.Join(folderPath, ".stignore"))
 	fsInput := make(chan string)
 	c := make(chan notify.EventInfo, maxFiles)
@@ -396,21 +404,21 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 	notify.SetDoNotWatch(ignoreTest)
 	if err := notify.Watch(filepath.Join(folderPath, "..."), c, notify.All); err != nil {
 		if strings.Contains(err.Error(), "too many open files") || strings.Contains(err.Error(), "no space left on device") {
-			msg := "Failed to install inotify handler for " + folder.ID + ". Please increase inotify limits, see http://bit.ly/1PxkdUC for more information."
+			msg := "Failed to install inotify handler for " + folder.Label + ". Please increase inotify limits, see http://bit.ly/1PxkdUC for more information."
 			Warning.Println(msg, err)
 			informError(msg)
 			return
 		} else {
-			Warning.Println("Failed to install inotify handler for "+folder.ID+".", err)
-			informError("Failed to install inotify handler for " + folder.ID + ": " + err.Error())
+			Warning.Println("Failed to install inotify handler for "+folder.Label+".", err)
+			informError("Failed to install inotify handler for " + folder.Label + ": " + err.Error())
 			return
 		}
 	}
 	defer notify.Stop(c)
 	go accumulateChanges(debounceTimeout, folder.ID, folderPath, dirVsFiles, stInput, fsInput, informChange)
-	OK.Println("Watching " + folder.ID + ": " + folderPath)
+	OK.Println("Watching " + folder.Label + ": " + folderPath)
 	if folder.RescanIntervalS < 1800 && delayScan <= 0 {
-		OK.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.ID)
+		OK.Printf("The rescan interval of folder %s can be increased to 3600 (an hour) or even 86400 (a day) as changes should be observed immediately while syncthing-inotify is running.", folder.Label)
 	}
 	// will we ever get out of this loop?
 	for {
@@ -922,7 +930,7 @@ func waitForSyncAndExitIfNeeded(folders []FolderConfiguration) {
 			}
 		}
 		if !seen {
-			Warning.Println("Folder " + newF.ID + " changed")
+			Warning.Println("Folder " + newF.Label + " changed")
 			same = false
 		}
 	}
