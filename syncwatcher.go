@@ -391,7 +391,12 @@ func getFolders() []FolderConfiguration {
 // watchFolder installs inotify watcher for a folder, launches
 // goroutine which receives changed items. It never exits.
 func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
-	folderPath := expandTilde(folder.Path)
+	folderPath, err := realPath(expandTilde(folder.Path))
+	if err != nil {
+		Warning.Println("Failed to install inotify handler for "+folder.Label+".", err)
+		informError("Failed to install inotify handler for " + folder.Label + ": " + err.Error())
+		return
+	}
 	ignores := ignore.New(false)
 	Trace.Println("Getting ignore patterns for " + folder.Label)
 	ignores.Load(filepath.Join(folderPath, ".stignore"))
@@ -432,6 +437,14 @@ func watchFolder(folder FolderConfiguration, stInput chan STEvent) {
 		Trace.Println("Change detected in: " + evAbsolutePath)
 		fsInput <- evRelPath
 	}
+}
+
+func realPath(path string) (string, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(path)
 }
 
 func relativePath(path string, folderPath string) string {
