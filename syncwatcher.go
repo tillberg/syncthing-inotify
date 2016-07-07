@@ -17,18 +17,20 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/zillode/notify"
 	"github.com/syncthing/syncthing/lib/ignore"
+	"github.com/zillode/notify"
 )
 
 // Configuration is used in parsing response from ST
@@ -286,6 +288,7 @@ func main() {
 	}
 	// Note: Lose thread ownership of stChans
 	go watchSTEvents(stChans, allFolders)
+	go listenForSighup()
 
 	code := <-stop
 	OK.Println("Exiting")
@@ -316,6 +319,13 @@ func restart() bool {
 	proc.Release()
 	stop <- 3
 	return true
+}
+
+func listenForSighup() {
+	sighupChan := make(chan os.Signal)
+	signal.Notify(sighupChan, syscall.SIGHUP)
+	<-sighupChan
+	stop <- 0
 }
 
 // filterFolders refines folders list using global vars watchFolders and skipFolders
