@@ -1062,14 +1062,15 @@ func usageFor(fs *flag.FlagSet, usage string, extra string) func() {
 func getSTConfig(dir string) (STConfig, error) {
 	var path = filepath.Join(dir, "config.xml")
 	nc := STNestedConfig{Config: STConfig{Target: "localhost:8384"}}
-	if file, err := os.Open(path); err != nil {
+	fd, err := os.Open(path)
+	if err != nil {
 		return nc.Config, err
-	} else {
-		err := xml.NewDecoder(file).Decode(&nc)
-		if err != nil {
-			log.Fatal(err)
-			return nc.Config, err
-		}
+	}
+	defer fd.Close()
+	err = xml.NewDecoder(fd).Decode(&nc)
+	if err != nil {
+		log.Fatal(err)
+		return nc.Config, err
 	}
 	// This is not in the XML, but we can determine a sane default
 	nc.Config.CsrfFile = filepath.Join(getSTDefaultConfDir(), "csrftokens.txt")
