@@ -12,7 +12,7 @@ import (
 
 var (
 	slash         = string(os.PathSeparator)
-	testDirectory = "test" + slash
+	testDirectory = filepath.Join(os.Getenv("TMPDIR"), "test") + slash
 )
 
 func clearTestDir() {
