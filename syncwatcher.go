@@ -186,8 +186,8 @@ func init() {
 	flag.StringVar(&apiKey, "api", c.APIKey, "API key")
 	flag.BoolVar(&apiKeyStdin, "api-stdin", false, "Provide API key through stdin")
 	flag.BoolVar(&authPassStdin, "password-stdin", false, "Provide password through stdin")
-	flag.Var(&watchFolders, "folders", "A comma-separated list of folders to watch (all by default)")
-	flag.Var(&skipFolders, "skip-folders", "A comma-separated list of folders to skip inotify watching")
+	flag.Var(&watchFolders, "folders", "A comma-separated list of folder labels or IDs to watch (all by default)")
+	flag.Var(&skipFolders, "skip-folders", "A comma-separated list of folder labels or IDs to skip inotify watching")
 	flag.IntVar(&delayScan, "delay-scan", delayScan, "Automatically delay next scan interval (in seconds)")
 	flag.BoolVar(&showVersion, "version", false, "Show version")
 
@@ -334,7 +334,7 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 		var fs []FolderConfiguration
 		for _, f := range folders {
 			for _, watch := range watchFolders {
-				if f.ID == watch {
+				if f.ID == watch || f.Label == watch {
 					fs = append(fs, f)
 					break
 				}
@@ -347,7 +347,7 @@ func filterFolders(folders []FolderConfiguration) []FolderConfiguration {
 		for _, f := range folders {
 			keep := true
 			for _, skip := range skipFolders {
-				if f.ID == skip {
+				if f.ID == skip || f.Label == skip {
 					keep = false
 					break
 				}
@@ -1072,14 +1072,15 @@ func usageFor(fs *flag.FlagSet, usage string, extra string) func() {
 func getSTConfig(dir string) (STConfig, error) {
 	var path = filepath.Join(dir, "config.xml")
 	nc := STNestedConfig{Config: STConfig{Target: "localhost:8384"}}
-	if file, err := os.Open(path); err != nil {
+	fd, err := os.Open(path)
+	if err != nil {
 		return nc.Config, err
-	} else {
-		err := xml.NewDecoder(file).Decode(&nc)
-		if err != nil {
-			log.Fatal(err)
-			return nc.Config, err
-		}
+	}
+	defer fd.Close()
+	err = xml.NewDecoder(fd).Decode(&nc)
+	if err != nil {
+		log.Fatal(err)
+		return nc.Config, err
 	}
 	// This is not in the XML, but we can determine a sane default
 	nc.Config.CsrfFile = filepath.Join(getSTDefaultConfDir(), "csrftokens.txt")

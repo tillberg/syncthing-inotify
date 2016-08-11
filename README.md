@@ -46,8 +46,8 @@ go build -ldflags "-w -X main.Version `git describe --abbrev=0 --tags`"
 #### Troubleshooting for folders with many files on Linux
 * Linux limits the amount of inotify watchers (typically to [8192](http://stackoverflow.com/a/20355253)). Therefore, if you wish to sync many files and folders, you'll need to increase the upper limit:
 
-  Permanently fix `Too many open files` on most Linux distributions: ```sudo sh -c 'echo -e "fs.inotify.max_user_watches=204800\n" >> /etc/sysctl.conf'```
+  Permanently fix `Too many open files` on most Linux distributions: ```echo "fs.inotify.max_user_watches=204800" | sudo tee -a /etc/sysctl.conf```
   
-  On Arch Linux, instead run: ```sudo sh -c 'echo -e "fs.inotify.max_user_watches=204800\n" >> /etc/sysctl.d/90-override.conf'``` (see [this forum post](https://bbs.archlinux.org/viewtopic.php?id=193020))
+  On Arch Linux, instead run: ```echo "fs.inotify.max_user_watches=204800" | sudo tee -a /etc/sysctl.d/90-override.conf``` (see [this forum post](https://bbs.archlinux.org/viewtopic.php?id=193020))
 
   Fix `Too many open files` for Linux until next reboot: ```sudo sh -c 'echo 204800 > /proc/sys/fs/inotify/max_user_watches'``` (should be applied before launching syncthing-inotify)
